@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Baileys Session Manager</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .response {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .qr-container {
+            text-align: center;
+            margin-top: 20px;
+        }
+        #qr-code {
+            max-width: 200px;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Baileys Session Manager</h1>
+    <div class="container">
+        <div class="form-group">
+            <label for="api-url">API Server URL:</label>
+            <input type="text" id="api-url" value="http://localhost:3001">
+        </div>
+        <div class="form-group">
+            <label for="access-token">Access Token:</label>
+            <input type="password" id="access-token" placeholder="Enter your ACCESS_TOKEN_SECRET">
+        </div>
+        <button id="start-btn">Start Session</button>
+        <button id="status-btn">Check Status</button>
+        <button id="logout-btn">Logout</button>
+
+        <h2>Send Messages</h2>
+        <div class="form-group">
+            <label for="phone-number">Phone Number:</label>
+            <input type="text" id="phone-number" placeholder="e.g. 1234567890 or 1234567890@whatsapp.net">
+        </div>
+        <div class="form-group">
+            <label for="message-text">Message:</label>
+            <textarea id="message-text" rows="3" placeholder="Enter your message"></textarea>
+        </div>
+        <button id="check-num-btn">Check Number</button>
+        <button id="send-msg-btn">Send Message</button>
+
+        <div id="response-container"></div>
+    </div>
+
+    <script>
+        const apiUrlInput = document.getElementById('api-url');
+        const accessTokenInput = document.getElementById('access-token');
+        const startBtn = document.getElementById('start-btn');
+        const statusBtn = document.getElementById('status-btn');
+        const logoutBtn = document.getElementById('logout-btn');
+        const phoneNumberInput = document.getElementById('phone-number');
+        const messageTextInput = document.getElementById('message-text');
+        const checkNumBtn = document.getElementById('check-num-btn');
+        const sendMsgBtn = document.getElementById('send-msg-btn');
+        const responseContainer = document.getElementById('response-container');
+
+        function getAuthHeaders() {
+            const token = accessTokenInput.value;
+            if (!token) {
+                alert('Please enter access token');
+                return null;
+            }
+            return {
+                'Content-Type': 'application/json',
+                'x-access-token': token
+            };
+        }
+
+        function showResponse(data, isError = false) {
+            responseContainer.innerHTML = '';
+            const responseDiv = document.createElement('div');
+            responseDiv.className = `response ${isError ? 'error' : 'success'}`;
+
+            let content = '';
+            if (data.qrBase64) {
+                const qrImg = document.createElement('img');
+                qrImg.id = 'qr-code';
+                qrImg.src = data.qrBase64;
+                qrImg.alt = 'QR Code';
+                responseContainer.appendChild(qrImg);
+                content += 'QR Code generated. Scan to connect.\n\n';
+            }
+
+            if (typeof data === 'string') {
+                content += data;
+            } else {
+                content += JSON.stringify(data, null, 2);
+            }
+
+            responseDiv.textContent = content;
+            responseContainer.appendChild(responseDiv);
+        }
+
+        startBtn.addEventListener('click', async () => {
+            const headers = getAuthHeaders();
+            if (!headers) return;
+
+            startBtn.disabled = true;
+            startBtn.textContent = 'Starting...';
+
+            try {
+                const response = await fetch(`${apiUrlInput.value}/api/session/start`, {
+                    method: 'POST',
+                    headers: headers
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    showResponse(data);
+                } else {
+                    showResponse(data, true);
+                }
+            } catch (error) {
+                showResponse('Network error: ' + error.message, true);
+            }
+
+            startBtn.disabled = false;
+            startBtn.textContent = 'Start Session';
+        });
+
+        statusBtn.addEventListener('click', async () => {
+            const headers = getAuthHeaders();
+            if (!headers) return;
+
+            statusBtn.disabled = true;
+            statusBtn.textContent = 'Checking...';
+
+            try {
+                const response = await fetch(`${apiUrlInput.value}/api/session/status`, {
+                    headers: headers
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    showResponse(data);
+                } else {
+                    showResponse(data, true);
+                }
+            } catch (error) {
+                showResponse('Network error: ' + error.message, true);
+            }
+
+            statusBtn.disabled = false;
+            statusBtn.textContent = 'Check Status';
+        });
+
+        logoutBtn.addEventListener('click', async () => {
+            const headers = getAuthHeaders();
+            if (!headers) return;
+
+            logoutBtn.disabled = true;
+            logoutBtn.textContent = 'Logging out...';
+
+            try {
+                const response = await fetch(`${apiUrlInput.value}/api/session/logout`, {
+                    method: 'POST',
+                    headers: headers
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    showResponse(data);
+                } else {
+                    showResponse(data, true);
+                }
+            } catch (error) {
+                showResponse('Network error: ' + error.message, true);
+            }
+
+            logoutBtn.disabled = false;
+            logoutBtn.textContent = 'Logout';
+        });
+
+        checkNumBtn.addEventListener('click', async () => {
+            const headers = getAuthHeaders();
+            if (!headers) return;
+
+            const phoneNumber = phoneNumberInput.value.trim();
+            if (!phoneNumber) {
+                alert('Please enter a phone number');
+                return;
+            }
+
+            checkNumBtn.disabled = true;
+            checkNumBtn.textContent = 'Checking...';
+
+            try {
+                const response = await fetch(`${apiUrlInput.value}/api/message/check-number`, {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify({ to: phoneNumber })
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    showResponse(data);
+                } else {
+                    showResponse(data, true);
+                }
+            } catch (error) {
+                showResponse('Network error: ' + error.message, true);
+            }
+
+            checkNumBtn.disabled = false;
+            checkNumBtn.textContent = 'Check Number';
+        });
+
+        sendMsgBtn.addEventListener('click', async () => {
+            const headers = getAuthHeaders();
+            if (!headers) return;
+
+            const phoneNumber = phoneNumberInput.value.trim();
+            const message = messageTextInput.value.trim();
+
+            if (!phoneNumber) {
+                alert('Please enter a phone number');
+                return;
+            }
+            if (!message) {
+                alert('Please enter a message');
+                return;
+            }
+
+            sendMsgBtn.disabled = true;
+            sendMsgBtn.textContent = 'Sending...';
+
+            try {
+                const response = await fetch(`${apiUrlInput.value}/api/message/send-text`, {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify({ to: phoneNumber, message: message })
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    showResponse(data);
+                } else {
+                    showResponse(data, true);
+                }
+            } catch (error) {
+                showResponse('Network error: ' + error.message, true);
+            }
+
+            sendMsgBtn.disabled = false;
+            sendMsgBtn.textContent = 'Send Message';
+        });
+    </script>
+</body>
+</html>
