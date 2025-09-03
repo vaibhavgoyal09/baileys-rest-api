@@ -20,6 +20,7 @@ declare class WhatsAppService {
     private reconnectAttempts;
     private readonly MAX_RECONNECT_ATTEMPTS;
     constructor();
+    isSessionValid(): Promise<boolean>;
     resetReconnectAttempts(): void;
     waitForQR(timeout?: number): Promise<string | null>;
     initialize(isReconnecting?: boolean): Promise<WhatsAppServiceResult>;
@@ -28,6 +29,7 @@ declare class WhatsAppService {
     static notifyWebhook(event: string, data: any): Promise<void>;
     getConnectionStatus(): ConnectionStatus;
     getConversations(options?: any): Promise<any[]>;
+    getMessages(jid: string, options?: any): Promise<any[]>;
     sendMessage(to: string, message: string): Promise<any>;
     checkNumber(phoneNumber: string): Promise<any>;
     static extractMessageContent(msg: any): any;

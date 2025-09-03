@@ -18,6 +18,25 @@ class WhatsAppService {
         this.MAX_RECONNECT_ATTEMPTS = 5;
         this.sessionPath = path.join(__dirname, '../sessions');
     }
+    async isSessionValid() {
+        try {
+            await fs.access(this.sessionPath);
+            const credsPath = path.join(this.sessionPath, 'creds.json');
+            await fs.access(credsPath);
+            const credsData = await fs.readFile(credsPath, 'utf-8');
+            const creds = JSON.parse(credsData);
+            if (creds && creds.me && creds.platform) {
+                logger.debug('Session appears valid');
+                return true;
+            }
+            logger.warn('Session creds.json exists but appears invalid');
+            return false;
+        }
+        catch (error) {
+            logger.debug('Session validation failed:', error);
+            return false;
+        }
+    }
     resetReconnectAttempts() {
         this.reconnectAttempts = 0;
     }
@@ -156,6 +175,10 @@ class WhatsAppService {
                 if (m.type === 'notify') {
                     try {
                         await Promise.all(m.messages.map(async (msg) => {
+                            const messageType = Object.keys(msg.message || {})[0] || '';
+                            if (messageType === 'protocolMessage') {
+                                return;
+                            }
                             logger.debug({
                                 msg: 'Raw message received',
                                 data: msg,
@@ -165,7 +188,7 @@ class WhatsAppService {
                                 from: msg.key.remoteJid,
                                 fromMe: msg.key.fromMe,
                                 timestamp: msg.messageTimestamp,
-                                type: Object.keys(msg.message || {})[0] || '',
+                                type: messageType,
                                 pushName: msg.pushName,
                                 content: WhatsAppService.extractMessageContent(msg),
                                 isGroup: msg.key.remoteJid?.endsWith('@g.us') || false,
@@ -359,6 +382,22 @@ class WhatsAppService {
             return [];
         }
     }
+    async getMessages(jid, options = {}) {
+        try {
+            const limit = Number(options.limit) || 50;
+            const cursor = (options.cursor !== undefined && options.cursor !== null)
+                ? Number(options.cursor)
+                : null;
+            return Store.listMessages(jid, { limit, cursor });
+        }
+        catch (error) {
+            errorLogger.error({
+                msg: 'Failed to get messages',
+                error: error?.message || error,
+            });
+            return [];
+        }
+    }
     async sendMessage(to, message) {
         if (!this.isConnected) {
             throw new Error('WhatsApp connection is not active');
@@ -497,6 +536,8 @@ class WhatsAppService {
                     displayName: messageContent.displayName,
                     vcard: messageContent.vcard,
                 };
+            case 'protocolMessage':
+                return null;
             default:
                 return {
                     type: messageType,

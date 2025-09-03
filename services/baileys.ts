@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 import { pino } from 'pino';
 import fs from 'fs/promises';
 import { logger, errorLogger } from '../utils/logger.js';
-import Store from './sqliteStore.js';
+import Store, { Chat } from './sqliteStore.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -47,6 +47,33 @@ class WhatsAppService {
 
   constructor() {
     this.sessionPath = path.join(__dirname, '../sessions');
+  }
+
+  async isSessionValid(): Promise<boolean> {
+    try {
+      // Check if session directory exists
+      await fs.access(this.sessionPath);
+
+      // Check if creds.json exists (main auth file)
+      const credsPath = path.join(this.sessionPath, 'creds.json');
+      await fs.access(credsPath);
+
+      // Try to read and parse creds.json to ensure it's valid
+      const credsData = await fs.readFile(credsPath, 'utf-8');
+      const creds = JSON.parse(credsData);
+
+      // Basic validation: check if it has essential fields
+      if (creds && creds.me && creds.platform) {
+        logger.debug('Session appears valid');
+        return true;
+      }
+
+      logger.warn('Session creds.json exists but appears invalid');
+      return false;
+    } catch (error) {
+      logger.debug('Session validation failed:', error);
+      return false;
+    }
   }
 
   resetReconnectAttempts(): void {
@@ -175,8 +202,13 @@ class WhatsAppService {
       this.sock.ev.on('chats.set', ({ chats }: any) => {
         try {
           const list = chats || [];
+          logger.debug({
+            msg: 'chats.set event fired',
+            count: list.length,
+            chats: list.slice(0, 3) // Log first 3 chats for debugging
+          });
           Store.upsertChats(list);
-          logger.debug({ msg: 'Chats set synced', count: list.length });
+          logger.debug({ msg: 'Chats set synced successfully', count: list.length });
         } catch (e) {
           errorLogger.error({ msg: 'Error syncing chats.set', error: (e as Error)?.message || e });
         }
@@ -418,6 +450,36 @@ class WhatsAppService {
     };
   }
 
+  async syncChatsFromStore(): Promise<void> {
+    try {
+      if (!this.sock || !this.sock.store) {
+        logger.warn({ msg: 'Cannot sync chats: socket or store not available' });
+        return;
+      }
+
+      const chats = this.sock.store.chats || new Map();
+      const chatsArray = Array.from(chats.values()).filter((chat: any) => chat && chat.id);
+
+      logger.debug({
+        msg: 'Syncing chats from store',
+        chatCount: chatsArray.length,
+        chats: chatsArray.slice(0, 3) // Log first 3 chats
+      });
+
+      if (chatsArray.length > 0) {
+        Store.upsertChats(chatsArray as Chat[]);
+        logger.info({ msg: 'Chats synced from store successfully', count: chatsArray.length });
+      } else {
+        logger.warn({ msg: 'No chats found in store to sync' });
+      }
+    } catch (error: any) {
+      errorLogger.error({
+        msg: 'Failed to sync chats from store',
+        error: error?.message || error
+      });
+    }
+  }
+
   async getConversations(options: any = {}): Promise<any[]> {
     // touch instance field to satisfy eslint class-methods-use-this
     const { isConnected } = this; // eslint-disable-line no-unused-vars
@@ -426,10 +488,57 @@ class WhatsAppService {
       const cursor = (options.cursor !== undefined && options.cursor !== null)
         ? Number(options.cursor)
         : null;
-      return Store.listConversations({ limit, cursor });
+
+      logger.debug({
+        msg: 'getConversations called',
+        options,
+        limit,
+        cursor,
+        isConnected: this.isConnected
+      });
+
+      // First try to sync chats if database is empty
+      const existingConversations = Store.listConversations({ limit: 1, cursor: null });
+      logger.debug({
+        msg: 'Checking database state',
+        existingCount: existingConversations.length,
+        hasSocket: !!this.sock,
+        hasStore: !!(this.sock && this.sock.store)
+      });
+
+      if (existingConversations.length === 0 && this.sock) {
+        logger.debug({ msg: 'No conversations in database, attempting to sync chats' });
+        await this.syncChatsFromStore();
+      }
+
+      const conversations = Store.listConversations({ limit, cursor });
+
+      logger.debug({
+        msg: 'getConversations result',
+        count: conversations.length,
+        conversations: conversations.slice(0, 3) // Log first 3 for debugging
+      });
+
+      return conversations;
     } catch (error: any) {
       errorLogger.error({
         msg: 'Failed to get conversations',
+        error: error?.message || error,
+      });
+      return [];
+    }
+  }
+
+  async getMessages(jid: string, options: any = {}): Promise<any[]> {
+    try {
+      const limit = Number(options.limit) || 50;
+      const cursor = (options.cursor !== undefined && options.cursor !== null)
+        ? Number(options.cursor)
+        : null;
+      return Store.listMessages(jid, { limit, cursor });
+    } catch (error: any) {
+      errorLogger.error({
+        msg: 'Failed to get messages',
         error: error?.message || error,
       });
       return [];

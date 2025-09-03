@@ -105,6 +105,16 @@
         <button id="check-num-btn">Check Number</button>
         <button id="send-msg-btn">Send Message</button>
 
+        <h2>Conversations</h2>
+        <button id="fetch-conversations-btn">Fetch All Conversations</button>
+
+        <h2>Messages</h2>
+        <div class="form-group">
+            <label for="conversation-jid">Conversation JID:</label>
+            <input type="text" id="conversation-jid" placeholder="e.g. 1234567890@s.whatsapp.net">
+        </div>
+        <button id="fetch-messages-btn">Fetch Messages</button>
+
         <div id="response-container"></div>
     </div>
 
@@ -118,6 +128,9 @@
         const messageTextInput = document.getElementById('message-text');
         const checkNumBtn = document.getElementById('check-num-btn');
         const sendMsgBtn = document.getElementById('send-msg-btn');
+        const fetchConversationsBtn = document.getElementById('fetch-conversations-btn');
+        const conversationJidInput = document.getElementById('conversation-jid');
+        const fetchMessagesBtn = document.getElementById('fetch-messages-btn');
         const responseContainer = document.getElementById('response-container');
 
         function getAuthHeaders() {
@@ -309,6 +322,64 @@
 
             sendMsgBtn.disabled = false;
             sendMsgBtn.textContent = 'Send Message';
+        });
+
+        fetchConversationsBtn.addEventListener('click', async () => {
+            const headers = getAuthHeaders();
+            if (!headers) return;
+
+            fetchConversationsBtn.disabled = true;
+            fetchConversationsBtn.textContent = 'Fetching...';
+
+            try {
+                const response = await fetch(`${apiUrlInput.value}/api/message/conversations`, {
+                    headers: headers
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    showResponse(data);
+                } else {
+                    showResponse(data, true);
+                }
+            } catch (error) {
+                showResponse('Network error: ' + error.message, true);
+            }
+
+            fetchConversationsBtn.disabled = false;
+            fetchConversationsBtn.textContent = 'Fetch All Conversations';
+        });
+
+        fetchMessagesBtn.addEventListener('click', async () => {
+            const headers = getAuthHeaders();
+            if (!headers) return;
+
+            const jid = conversationJidInput.value.trim();
+            if (!jid) {
+                alert('Please enter a conversation JID');
+                return;
+            }
+
+            fetchMessagesBtn.disabled = true;
+            fetchMessagesBtn.textContent = 'Fetching...';
+
+            try {
+                const response = await fetch(`${apiUrlInput.value}/api/message/messages/${encodeURIComponent(jid)}`, {
+                    headers: headers
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    showResponse(data);
+                } else {
+                    showResponse(data, true);
+                }
+            } catch (error) {
+                showResponse('Network error: ' + error.message, true);
+            }
+
+            fetchMessagesBtn.disabled = false;
+            fetchMessagesBtn.textContent = 'Fetch Messages';
         });
     </script>
 </body>

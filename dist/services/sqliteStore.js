@@ -69,13 +69,15 @@ class SQLiteStore {
         if (!content)
             return null;
         try {
-            if (typeof content === 'string')
-                return content;
-            if (content.type === 'text')
-                return content.text || null;
+            if (typeof content === 'string') {
+                return JSON.stringify({ type: 'text', text: content });
+            }
+            if (content.type === 'text') {
+                return JSON.stringify(content);
+            }
             if (content.type) {
                 const caption = content.caption ? `: ${content.caption}` : '';
-                return `[${content.type}]${caption}`;
+                return JSON.stringify({ type: content.type, description: `[${content.type}]${caption}` });
             }
             return JSON.stringify(content);
         }
@@ -176,6 +178,38 @@ class SQLiteStore {
         }
         catch (e) {
             errorLogger.error({ msg: 'SQLite listConversations failed', error: e.message });
+            return [];
+        }
+    }
+    listMessages(jid, { limit = 50, cursor = null } = {}) {
+        try {
+            let sql = `
+        SELECT id, jid, fromMe, timestamp, type, pushName, content
+        FROM messages
+        WHERE jid = @jid
+      `;
+            const params = { jid };
+            if (cursor !== null && cursor !== undefined) {
+                sql += ' AND timestamp < @cursor';
+                params.cursor = Number(cursor);
+            }
+            sql += ' ORDER BY timestamp DESC LIMIT @limit';
+            params.limit = Number(limit);
+            const stmt = this.db.prepare(sql);
+            const rows = stmt.all(params);
+            return rows.map((r) => ({
+                id: r.id,
+                from: r.jid,
+                fromMe: !!r.fromMe,
+                timestamp: r.timestamp,
+                type: r.type,
+                pushName: r.pushName,
+                content: r.content ? JSON.parse(r.content) : null,
+                isGroup: r.jid?.endsWith('@g.us') || false,
+            }));
+        }
+        catch (e) {
+            errorLogger.error({ msg: 'SQLite listMessages failed', error: e.message });
             return [];
         }
     }

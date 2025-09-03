@@ -12,6 +12,9 @@ import responseHandler from './middlewares/responseHandler.js';
 import sessionRoutes from './routes/session.js';
 import messageRoutes from './routes/message.js';
 
+// Services
+import WhatsAppService from './services/baileys.js';
+
 // Logger
 import { logger } from './utils/logger.js';
 
@@ -51,8 +54,26 @@ app.use('/api/message', messageRoutes);
 
 const HOST = process.env.HOST || 'localhost';
 const PORT = parseInt(process.env.PORT || '3001', 10);
-app.listen(PORT, HOST, () => {
+app.listen(PORT, HOST, async () => {
   logger.info(`Server running at http://${HOST}:${PORT}/`);
+
+  // Auto-connect to WhatsApp if session is available and valid
+  try {
+    const isValid = await WhatsAppService.isSessionValid();
+    if (isValid) {
+      logger.info('Valid session found, attempting to auto-connect to WhatsApp...');
+      const result = await WhatsAppService.initialize();
+      if (result.success) {
+        logger.info('WhatsApp auto-connection successful:', result.status);
+      } else {
+        logger.warn('WhatsApp auto-connection failed:', result.message);
+      }
+    } else {
+      logger.info('No valid session found, skipping auto-connection. Use /api/session/start to create a new session.');
+    }
+  } catch (error) {
+    logger.error('Error during WhatsApp auto-connection:', error);
+  }
 });
 
 export default app;

@@ -30,4 +30,29 @@ router.post('/send-text', verifyToken, validator(sendText), async (req: Request,
   }
 });
 
+router.get('/conversations', verifyToken, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const options = req.query;
+    const conversations = await WhatsAppService.getConversations(options);
+    (res as any).sendResponse(200, conversations);
+  } catch (error) {
+    (res as any).sendError(500, error);
+  }
+});
+
+router.get('/messages/:jid', verifyToken, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { jid } = req.params;
+    if (!jid) {
+      (res as any).sendError(400, 'JID is required');
+      return;
+    }
+    const options = req.query;
+    const messages = await WhatsAppService.getMessages(jid, options);
+    (res as any).sendResponse(200, messages);
+  } catch (error) {
+    (res as any).sendError(500, error);
+  }
+});
+
 export default router;

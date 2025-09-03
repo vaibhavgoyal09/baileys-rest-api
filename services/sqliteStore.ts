@@ -7,7 +7,7 @@ import { logger, errorLogger } from '../utils/logger.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-interface Chat {
+export interface Chat {
   id?: string;
   jid?: string;
   name?: string;
@@ -47,6 +47,7 @@ class SQLiteStore {
 
   constructor(dbFilePath: string = path.join(__dirname, '..', 'data', 'whatsapp.db')) {
     this.dbFilePath = dbFilePath;
+    logger.debug({ msg: 'SQLiteStore constructor called', dbFilePath });
     SQLiteStore.ensureDir(path.dirname(this.dbFilePath));
     this.db = new Database(this.dbFilePath);
     this.initSchema();
@@ -114,12 +115,16 @@ class SQLiteStore {
   stringifyContent(content: any): string | null {
     if (!content) return null;
     try {
-      if (typeof content === 'string') return content;
-      if (content.type === 'text') return content.text || null;
+      if (typeof content === 'string') {
+        return JSON.stringify({ type: 'text', text: content });
+      }
+      if (content.type === 'text') {
+        return JSON.stringify(content);
+      }
       // for other types keep a compact description
       if (content.type) {
         const caption = content.caption ? `: ${content.caption}` : '';
-        return `[${content.type}]${caption}`;
+        return JSON.stringify({ type: content.type, description: `[${content.type}]${caption}` });
       }
       return JSON.stringify(content);
     } catch (e) {
@@ -213,9 +218,22 @@ class SQLiteStore {
       sql += ' LIMIT @limit';
       params.limit = Number(limit);
 
+      logger.debug({
+        msg: 'listConversations query',
+        sql,
+        params
+      });
+
       const stmt = this.db.prepare(sql);
       const rows = stmt.all(params);
-      return rows.map((r: any) => ({
+
+      logger.debug({
+        msg: 'listConversations raw results',
+        rowCount: rows.length,
+        rows: rows.slice(0, 3) // Log first 3 rows
+      });
+
+      const conversations = rows.map((r: any) => ({
         jid: r.jid,
         name: r.name,
         isGroup: !!r.isGroup,
@@ -223,8 +241,50 @@ class SQLiteStore {
         lastMessageTimestamp: r.lastMessageTimestamp || null,
         lastMessageText: r.lastMessageText || null,
       }));
+
+      logger.debug({
+        msg: 'listConversations processed results',
+        count: conversations.length,
+        conversations: conversations.slice(0, 3)
+      });
+
+      return conversations;
     } catch (e) {
       errorLogger.error({ msg: 'SQLite listConversations failed', error: (e as Error).message });
+      return [];
+    }
+  }
+
+  // List messages for a specific chat
+  listMessages(jid: string, { limit = 50, cursor = null }: { limit?: number; cursor?: number | null } = {}): MessageInfo[] {
+    try {
+      let sql = `
+        SELECT id, jid, fromMe, timestamp, type, pushName, content
+        FROM messages
+        WHERE jid = @jid
+      `;
+      const params: any = { jid };
+      if (cursor !== null && cursor !== undefined) {
+        sql += ' AND timestamp < @cursor';
+        params.cursor = Number(cursor);
+      }
+      sql += ' ORDER BY timestamp DESC LIMIT @limit';
+      params.limit = Number(limit);
+
+      const stmt = this.db.prepare(sql);
+      const rows = stmt.all(params);
+      return rows.map((r: any) => ({
+        id: r.id,
+        from: r.jid,
+        fromMe: !!r.fromMe,
+        timestamp: r.timestamp,
+        type: r.type,
+        pushName: r.pushName,
+        content: r.content ? JSON.parse(r.content) : null,
+        isGroup: r.jid?.endsWith('@g.us') || false,
+      }));
+    } catch (e) {
+      errorLogger.error({ msg: 'SQLite listMessages failed', error: (e as Error).message });
       return [];
     }
   }

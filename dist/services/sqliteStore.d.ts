@@ -44,6 +44,10 @@ declare class SQLiteStore {
         limit?: number;
         cursor?: number | null;
     }): Conversation[];
+    listMessages(jid: string, { limit, cursor }?: {
+        limit?: number;
+        cursor?: number | null;
+    }): MessageInfo[];
 }
 declare const store: SQLiteStore;
 export default store;

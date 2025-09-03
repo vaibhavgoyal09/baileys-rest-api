@@ -29,5 +29,30 @@ router.post('/send-text', verifyToken, validator(sendText), async (req, res) => 
         res.sendError(500, error);
     }
 });
+router.get('/conversations', verifyToken, async (req, res) => {
+    try {
+        const options = req.query;
+        const conversations = await WhatsAppService.getConversations(options);
+        res.sendResponse(200, conversations);
+    }
+    catch (error) {
+        res.sendError(500, error);
+    }
+});
+router.get('/messages/:jid', verifyToken, async (req, res) => {
+    try {
+        const { jid } = req.params;
+        if (!jid) {
+            res.sendError(400, 'JID is required');
+            return;
+        }
+        const options = req.query;
+        const messages = await WhatsAppService.getMessages(jid, options);
+        res.sendResponse(200, messages);
+    }
+    catch (error) {
+        res.sendError(500, error);
+    }
+});
 export default router;
 //# sourceMappingURL=message.js.map
