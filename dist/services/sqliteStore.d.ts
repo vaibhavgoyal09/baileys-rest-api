@@ -1,4 +1,4 @@
-interface Chat {
+export interface Chat {
     id?: string;
     jid?: string;
     name?: string;

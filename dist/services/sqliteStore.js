@@ -9,6 +9,7 @@ class SQLiteStore {
     constructor(dbFilePath = path.join(__dirname, '..', 'data', 'whatsapp.db')) {
         this.stmtListChatsBase = '';
         this.dbFilePath = dbFilePath;
+        logger.debug({ msg: 'SQLiteStore constructor called', dbFilePath });
         SQLiteStore.ensureDir(path.dirname(this.dbFilePath));
         this.db = new Database(this.dbFilePath);
         this.initSchema();
@@ -165,9 +166,19 @@ class SQLiteStore {
             sql += ' ORDER BY (lastMessageTimestamp IS NULL), lastMessageTimestamp DESC';
             sql += ' LIMIT @limit';
             params.limit = Number(limit);
+            logger.debug({
+                msg: 'listConversations query',
+                sql,
+                params
+            });
             const stmt = this.db.prepare(sql);
             const rows = stmt.all(params);
-            return rows.map((r) => ({
+            logger.debug({
+                msg: 'listConversations raw results',
+                rowCount: rows.length,
+                rows: rows.slice(0, 3)
+            });
+            const conversations = rows.map((r) => ({
                 jid: r.jid,
                 name: r.name,
                 isGroup: !!r.isGroup,
@@ -175,6 +186,12 @@ class SQLiteStore {
                 lastMessageTimestamp: r.lastMessageTimestamp || null,
                 lastMessageText: r.lastMessageText || null,
             }));
+            logger.debug({
+                msg: 'listConversations processed results',
+                count: conversations.length,
+                conversations: conversations.slice(0, 3)
+            });
+            return conversations;
         }
         catch (e) {
             errorLogger.error({ msg: 'SQLite listConversations failed', error: e.message });
