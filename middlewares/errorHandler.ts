@@ -1,7 +1,7 @@
-/* eslint-disable no-param-reassign */
-const { errorLogger, logger } = require('../utils/logger');
+import { Request, Response } from 'express';
+import { errorLogger, logger } from '../utils/logger.js';
 
-module.exports = (req, res, statusCode = 500, data = {}) => {
+const errorHandler = (req: Request, res: Response, statusCode: number = 500, data: any = {}): void => {
   try {
     if (typeof data !== 'object') {
       data = { message: data };
@@ -33,3 +33,5 @@ module.exports = (req, res, statusCode = 500, data = {}) => {
     logger.error(error);
   }
 };
+
+export default errorHandler;

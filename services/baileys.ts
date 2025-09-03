@@ -1,28 +1,61 @@
-const { default: makeWASocket, DisconnectReason, useMultiFileAuthState } = require('@whiskeysockets/baileys');
-const { Boom } = require('@hapi/boom');
-const path = require('path');
-const pino = require('pino');
-const fs = require('fs').promises;
-const { logger, errorLogger } = require('../utils/logger');
+import { default as makeWASocket, DisconnectReason, useMultiFileAuthState } from '@whiskeysockets/baileys';
+import { Boom } from '@hapi/boom';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { pino } from 'pino';
+import fs from 'fs/promises';
+import { logger, errorLogger } from '../utils/logger.js';
+import Store from './sqliteStore.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+interface WhatsAppServiceResult {
+  success: boolean;
+  status: string;
+  message?: string;
+  qr?: string;
+  error?: string;
+  reason?: string;
+}
+
+interface ConnectionStatus {
+  isConnected: boolean;
+  qr: string | null;
+  qrBase64?: string;
+}
+
+interface MessageInfo {
+  id: string;
+  from: string;
+  fromMe: boolean;
+  timestamp: number;
+  type: string;
+  pushName: string | null;
+  content: any;
+  isGroup: boolean;
+}
 
 class WhatsAppService {
+  private sock: any = null;
+  private isConnected: boolean = false;
+  private qr: string | null = null;
+  private sessionPath: string;
+  private connectionUpdateHandler: any = null;
+  private reconnectAttempts: number = 0;
+  private readonly MAX_RECONNECT_ATTEMPTS: number = 5;
+
   constructor() {
-    this.sock = null;
-    this.isConnected = false;
-    this.qr = null;
     this.sessionPath = path.join(__dirname, '../sessions');
-    this.connectionUpdateHandler = null;
-    this.reconnectAttempts = 0;
-    this.MAX_RECONNECT_ATTEMPTS = 5;
   }
 
-  resetReconnectAttempts() {
+  resetReconnectAttempts(): void {
     this.reconnectAttempts = 0;
   }
 
-  async waitForQR(timeout = 300000) {
+  async waitForQR(timeout: number = 300000): Promise<string | null> {
     return new Promise((resolve) => {
-      let timeoutId = null;
+      let timeoutId: NodeJS.Timeout | null = null;
 
       // Function to cleanup event handlers
       const cleanup = () => {
@@ -40,7 +73,7 @@ class WhatsAppService {
       }, timeout);
 
       if (this.sock) {
-        this.connectionUpdateHandler = (update) => {
+        this.connectionUpdateHandler = (update: any) => {
           const { connection, qr } = update;
 
           if (qr) {
@@ -61,7 +94,7 @@ class WhatsAppService {
     });
   }
 
-  async initialize(isReconnecting = false) {
+  async initialize(isReconnecting: boolean = false): Promise<WhatsAppServiceResult> {
     try {
       // Check if session directory exists
       try {
@@ -98,7 +131,7 @@ class WhatsAppService {
         logger: pino({ level: 'silent' }),
       });
 
-      this.sock.ev.on('connection.update', async (update) => {
+      this.sock.ev.on('connection.update', async (update: any) => {
         logger.debug({ msg: 'Connection update received', update });
         if (update.qr) {
           console.log('QR Code received:', update.qr);
@@ -114,7 +147,7 @@ class WhatsAppService {
             return;
           }
 
-          const statusCode = (lastDisconnect?.error instanceof Boom)?.output?.statusCode;
+          const statusCode = (lastDisconnect?.error instanceof Boom) ? (lastDisconnect.error as any).output?.statusCode : undefined;
           const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
 
           if (shouldReconnect && !this.isConnected) {
@@ -139,10 +172,40 @@ class WhatsAppService {
 
       this.sock.ev.on('creds.update', saveCreds);
 
-      this.sock.ev.on('messages.upsert', async (m) => {
+      this.sock.ev.on('chats.set', ({ chats }: any) => {
+        try {
+          const list = chats || [];
+          Store.upsertChats(list);
+          logger.debug({ msg: 'Chats set synced', count: list.length });
+        } catch (e) {
+          errorLogger.error({ msg: 'Error syncing chats.set', error: (e as Error)?.message || e });
+        }
+      });
+
+      this.sock.ev.on('contacts.upsert', (contacts: any) => {
+        try {
+          (contacts || []).forEach((c: any) => {
+            const jid = c.id || c.jid;
+            if (!jid) return;
+            const name = c.name || c.notify || c.pushName || null;
+            Store.upsertChatPartial(jid, { name });
+          });
+          logger.debug({ msg: 'Contacts upsert processed', count: (contacts || []).length });
+        } catch (e) {
+          errorLogger.error({ msg: 'Error processing contacts.upsert', error: (e as Error)?.message || e });
+        }
+      });
+
+      this.sock.ev.on('messages.upsert', async (m: any) => {
         if (m.type === 'notify') {
           try {
-            await Promise.all(m.messages.map(async (msg) => {
+            await Promise.all(m.messages.map(async (msg: any) => {
+              // Skip protocol messages as they are system messages
+              const messageType = Object.keys(msg.message || {})[0] || '';
+              if (messageType === 'protocolMessage') {
+                return;
+              }
+
               // Debug log for raw message
               logger.debug({
                 msg: 'Raw message received',
@@ -150,12 +213,12 @@ class WhatsAppService {
               });
 
               // Extract relevant message information
-              const messageInfo = {
+              const messageInfo: MessageInfo = {
                 id: msg.key.id,
                 from: msg.key.remoteJid,
                 fromMe: msg.key.fromMe,
                 timestamp: msg.messageTimestamp,
-                type: Object.keys(msg.message || {})[0],
+                type: messageType,
                 pushName: msg.pushName,
                 content: WhatsAppService.extractMessageContent(msg),
                 isGroup: msg.key.remoteJid?.endsWith('@g.us') || false,
@@ -166,6 +229,13 @@ class WhatsAppService {
                 msg: 'Processed message info',
                 data: messageInfo,
               });
+
+              // Persist to store
+              try {
+                Store.saveMessage(messageInfo);
+              } catch (e) {
+                errorLogger.error({ msg: 'Failed to persist incoming message', error: (e as Error)?.message || e });
+              }
 
               // Send to webhook
               await WhatsAppService.notifyWebhook('message.received', messageInfo);
@@ -179,7 +249,7 @@ class WhatsAppService {
                 timestamp: new Date(messageInfo.timestamp * 1000).toISOString(),
               });
             }));
-          } catch (error) {
+          } catch (error: any) {
             errorLogger.error({
               msg: 'Error processing incoming message',
               error: error.message,
@@ -220,7 +290,7 @@ class WhatsAppService {
         status: 'error',
         message: 'Failed to get QR code or establish connection',
       };
-    } catch (error) {
+    } catch (error: any) {
       errorLogger.error({
         msg: 'Error during WhatsApp connection initialization',
         error: error?.message || error,
@@ -235,7 +305,7 @@ class WhatsAppService {
     }
   }
 
-  async handleLogout(reason = 'normal_logout') {
+  async handleLogout(reason: string = 'normal_logout'): Promise<WhatsAppServiceResult> {
     try {
       // Clean up session files
       await fs.rm(this.sessionPath, { recursive: true, force: true });
@@ -259,7 +329,7 @@ class WhatsAppService {
         message: 'Session successfully terminated',
         reason,
       };
-    } catch (error) {
+    } catch (error: any) {
       errorLogger.error({
         msg: 'Error during session cleanup',
         error: error?.message || error,
@@ -273,7 +343,7 @@ class WhatsAppService {
     }
   }
 
-  async logout() {
+  async logout(): Promise<WhatsAppServiceResult> {
     try {
       if (this.sock) {
         await this.sock.logout();
@@ -284,7 +354,7 @@ class WhatsAppService {
         status: 'error',
         message: 'No active session found',
       };
-    } catch (error) {
+    } catch (error: any) {
       errorLogger.error({
         msg: 'Error during logout',
         error: error?.message || error,
@@ -298,7 +368,7 @@ class WhatsAppService {
     }
   }
 
-  static async notifyWebhook(event, data) {
+  static async notifyWebhook(event: string, data: any): Promise<void> {
     const webhookUrl = process.env.WEBHOOK_URL;
     if (!webhookUrl) {
       logger.warn({
@@ -331,7 +401,7 @@ class WhatsAppService {
         event,
         status: response.status,
       });
-    } catch (error) {
+    } catch (error: any) {
       errorLogger.error({
         msg: 'Error during webhook notification',
         event,
@@ -341,27 +411,73 @@ class WhatsAppService {
     }
   }
 
-  getConnectionStatus() {
+  getConnectionStatus(): ConnectionStatus {
     return {
       isConnected: this.isConnected,
       qr: this.qr,
     };
   }
 
-  async sendMessage(to, message) {
+  async getConversations(options: any = {}): Promise<any[]> {
+    // touch instance field to satisfy eslint class-methods-use-this
+    const { isConnected } = this; // eslint-disable-line no-unused-vars
+    try {
+      const limit = Number(options.limit) || 50;
+      const cursor = (options.cursor !== undefined && options.cursor !== null)
+        ? Number(options.cursor)
+        : null;
+      return Store.listConversations({ limit, cursor });
+    } catch (error: any) {
+      errorLogger.error({
+        msg: 'Failed to get conversations',
+        error: error?.message || error,
+      });
+      return [];
+    }
+  }
+
+  async sendMessage(to: string, message: string): Promise<any> {
     if (!this.isConnected) {
       throw new Error('WhatsApp connection is not active');
     }
 
+    // normalize to JID if a plain phone number was provided
+    let jid = String(to || '');
+    if (!jid.includes('@')) {
+      const digits = jid.replace(/[^\d]/g, '');
+      if (digits) {
+        jid = `${digits}@s.whatsapp.net`;
+      }
+    }
+
     try {
-      const result = await this.sock.sendMessage(to, { text: message });
+      const result = await this.sock.sendMessage(jid, { text: message });
       logger.info({
         msg: 'Message sent',
-        to,
+        to: jid,
         messageId: result.key.id,
       });
+
+      // Persist outgoing message
+      try {
+        const timestamp = result.messageTimestamp || Math.floor(Date.now() / 1000);
+        const messageInfo: MessageInfo = {
+          id: result.key.id,
+          from: result.key.remoteJid || jid,
+          fromMe: true,
+          timestamp,
+          type: 'conversation',
+          pushName: null,
+          content: { type: 'text', text: message },
+          isGroup: (jid || '').endsWith('@g.us'),
+        };
+        Store.saveMessage(messageInfo);
+      } catch (e) {
+        errorLogger.error({ msg: 'Failed to persist outgoing message', error: (e as Error)?.message || e });
+      }
+
       return result;
-    } catch (error) {
+    } catch (error: any) {
       errorLogger.error({
         msg: 'Failed to send message',
         error: error.message,
@@ -370,7 +486,7 @@ class WhatsAppService {
     }
   }
 
-  async checkNumber(phoneNumber) {
+  async checkNumber(phoneNumber: string): Promise<any> {
     if (!this.isConnected) {
       throw new Error('WhatsApp connection is not active');
     }
@@ -401,7 +517,7 @@ class WhatsAppService {
         exists: false,
         jid: null,
       };
-    } catch (error) {
+    } catch (error: any) {
       errorLogger.error({
         msg: 'Failed to check phone number',
         phoneNumber,
@@ -412,12 +528,12 @@ class WhatsAppService {
   }
 
   // Change to static method
-  static extractMessageContent(msg) {
+  static extractMessageContent(msg: any): any {
     if (!msg.message) return null;
 
     // Get the first message type (text, image, video, etc.)
     const messageType = Object.keys(msg.message)[0];
-    const messageContent = msg.message[messageType];
+    const messageContent = msg.message && messageType ? msg.message[messageType] : null;
 
     switch (messageType) {
       case 'conversation':
@@ -479,6 +595,10 @@ class WhatsAppService {
           vcard: messageContent.vcard,
         };
 
+      case 'protocolMessage':
+        // Protocol messages are system messages (acks, receipts, etc.) - no user content
+        return null;
+
       default:
         return {
           type: messageType,
@@ -488,4 +608,5 @@ class WhatsAppService {
   }
 }
 
-module.exports = new WhatsAppService();
+const whatsAppService = new WhatsAppService();
+export default whatsAppService;

@@ -1,24 +1,32 @@
-require('dotenv').config();
+import 'dotenv/config';
+import express, { Application, Request, Response, NextFunction } from 'express';
+import cors from 'cors';
 
-const express = require('express');
-const cors = require('cors');
+// Error Handler
+import errorHandler from './middlewares/errorHandler.js';
 
-const app = express();
+// Response Handler
+import responseHandler from './middlewares/responseHandler.js';
+
+// Routes
+import sessionRoutes from './routes/session.js';
+import messageRoutes from './routes/message.js';
+
+// Logger
+import { logger } from './utils/logger.js';
+
+const app: Application = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 // Error Handler
-const errorHandler = require('./middlewares/errorHandler');
-
-app.use((req, res, next) => {
+app.use((req: Request, res: Response, next: NextFunction) => {
   res.sendError = errorHandler.bind(null, req, res);
   next();
 });
 
 // Response Handler
-const responseHandler = require('./middlewares/responseHandler');
-
-app.use((req, res, next) => {
+app.use((req: Request, res: Response, next: NextFunction) => {
   res.sendResponse = responseHandler.bind(null, res);
   next();
 });
@@ -35,19 +43,16 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 // Routes
-app.use('/api/session', require('./routes/session'));
-app.use('/api/message', require('./routes/message'));
+app.use('/api/session', sessionRoutes);
+app.use('/api/message', messageRoutes);
 
 // 404
 // app.use((req, res) => { res.status(404).send(null); });
 
-// Logger
-const { logger } = require('./utils/logger');
-
 const HOST = process.env.HOST || 'localhost';
-const PORT = process.env.PORT || 3001;
+const PORT = parseInt(process.env.PORT || '3001', 10);
 app.listen(PORT, HOST, () => {
   logger.info(`Server running at http://${HOST}:${PORT}/`);
 });
 
-module.exports = app;
+export default app;

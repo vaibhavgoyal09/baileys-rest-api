@@ -1,4 +1,4 @@
-const pino = require('pino');
+import { pino } from 'pino';
 
 const errorDest = pino.destination('./error.log');
 const errorLogger = pino({}, errorDest);
@@ -17,7 +17,7 @@ const logger = pino({
   },
 });
 
-module.exports = {
+export {
   fileLogger,
   errorLogger,
   logger,
