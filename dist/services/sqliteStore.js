@@ -230,6 +230,80 @@ class SQLiteStore {
             return [];
         }
     }
+    getOldestMessageAnchor(jid) {
+        try {
+            const stmt = this.db.prepare(`
+        SELECT id, jid, fromMe, timestamp
+        FROM messages
+        WHERE jid = @jid
+        ORDER BY timestamp ASC
+        LIMIT 1
+      `);
+            const row = stmt.get({ jid });
+            if (!row) {
+                return null;
+            }
+            const key = {
+                id: String(row.id),
+                remoteJid: String(row.jid),
+                fromMe: !!row.fromMe
+            };
+            const messageTimestamp = Number(row.timestamp) || Math.floor(Date.now() / 1000);
+            return { key, messageTimestamp };
+        }
+        catch (e) {
+            errorLogger.error({ msg: 'SQLite getOldestMessageAnchor failed', error: e.message, jid });
+            return null;
+        }
+    }
+    saveMessagesBatch(messages) {
+        const tx = this.db.transaction((rows) => {
+            for (const message of rows) {
+                const { idempotencyKey, ...messageInfo } = message;
+                this.db.prepare(`
+          INSERT OR IGNORE INTO messages (
+            id, jid, fromMe, timestamp, type, pushName, content
+          ) VALUES (@id, @jid, @fromMe, @timestamp, @type, @pushName, @content)
+        `).run({
+                    id: messageInfo.id,
+                    jid: messageInfo.from,
+                    fromMe: messageInfo.fromMe ? 1 : 0,
+                    timestamp: Number(messageInfo.timestamp) || null,
+                    type: messageInfo.type || null,
+                    pushName: messageInfo.pushName || null,
+                    content: this.stringifyContent(messageInfo.content),
+                });
+                const lastText = this.stringifyContent(messageInfo.content);
+                this.stmtUpsertChat.run({
+                    jid: messageInfo.from,
+                    name: messageInfo.pushName || null,
+                    isGroup: messageInfo.isGroup ? 1 : (messageInfo.from?.endsWith('@g.us') ? 1 : 0),
+                    unreadCount: null,
+                    lastMessageTimestamp: Number(messageInfo.timestamp) || null,
+                    lastMessageText: lastText,
+                });
+            }
+        });
+        try {
+            tx(messages);
+        }
+        catch (e) {
+            errorLogger.error({ msg: 'SQLite saveMessagesBatch failed', error: e.message });
+        }
+    }
+    ping() {
+        return new Promise((resolve) => {
+            try {
+                const stmt = this.db.prepare('SELECT 1');
+                stmt.run();
+                resolve(true);
+            }
+            catch (e) {
+                errorLogger.error({ msg: 'SQLite ping failed', error: e.message });
+                resolve(false);
+            }
+        });
+    }
 }
 const store = new SQLiteStore();
 export default store;

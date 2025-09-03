@@ -48,6 +48,18 @@ declare class SQLiteStore {
         limit?: number;
         cursor?: number | null;
     }): MessageInfo[];
+    getOldestMessageAnchor(jid: string): {
+        key: {
+            id: string;
+            remoteJid: string;
+            fromMe: boolean;
+        };
+        messageTimestamp: number;
+    } | null;
+    saveMessagesBatch(messages: (MessageInfo & {
+        idempotencyKey: string;
+    })[]): void;
+    ping(): Promise<boolean>;
 }
 declare const store: SQLiteStore;
 export default store;

@@ -30,6 +30,9 @@ declare class WhatsAppService {
     getConnectionStatus(): ConnectionStatus;
     getConversations(options?: any): Promise<any[]>;
     getMessages(jid: string, options?: any): Promise<any[]>;
+    private delay;
+    private syncHistoryForChat;
+    syncHistoryOnReconnect(): Promise<void>;
     sendMessage(to: string, message: string): Promise<any>;
     checkNumber(phoneNumber: string): Promise<any>;
     static extractMessageContent(msg: any): any;

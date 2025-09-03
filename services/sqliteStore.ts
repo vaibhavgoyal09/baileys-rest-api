@@ -288,6 +288,90 @@ class SQLiteStore {
       return [];
     }
   }
+
+  // Return the oldest message anchor for a chat (used for history backfill)
+  // Provides a Baileys-compatible key object and its messageTimestamp
+  getOldestMessageAnchor(jid: string): { key: { id: string; remoteJid: string; fromMe: boolean }, messageTimestamp: number } | null {
+    try {
+      const stmt = this.db.prepare(`
+        SELECT id, jid, fromMe, timestamp
+        FROM messages
+        WHERE jid = @jid
+        ORDER BY timestamp ASC
+        LIMIT 1
+      `);
+      const row: any = stmt.get({ jid });
+      if (!row) {
+        return null;
+      }
+      const key = {
+        id: String(row.id),
+        remoteJid: String(row.jid),
+        fromMe: !!row.fromMe
+      };
+      const messageTimestamp = Number(row.timestamp) || Math.floor(Date.now() / 1000);
+      return { key, messageTimestamp };
+    } catch (e) {
+      errorLogger.error({ msg: 'SQLite getOldestMessageAnchor failed', error: (e as Error).message, jid });
+      return null;
+    }
+  }
+
+  // Batch insert messages with idempotency check
+  // Uses INSERT OR IGNORE to skip duplicates based on idempotencyKey
+  saveMessagesBatch(messages: (MessageInfo & { idempotencyKey: string })[]): void {
+    const tx = this.db.transaction((rows: (MessageInfo & { idempotencyKey: string })[]) => {
+      for (const message of rows) {
+        const { idempotencyKey, ...messageInfo } = message;
+        
+        // Insert message with idempotency key
+        this.db.prepare(`
+          INSERT OR IGNORE INTO messages (
+            id, jid, fromMe, timestamp, type, pushName, content
+          ) VALUES (@id, @jid, @fromMe, @timestamp, @type, @pushName, @content)
+        `).run({
+          id: messageInfo.id,
+          jid: messageInfo.from,
+          fromMe: messageInfo.fromMe ? 1 : 0,
+          timestamp: Number(messageInfo.timestamp) || null,
+          type: messageInfo.type || null,
+          pushName: messageInfo.pushName || null,
+          content: this.stringifyContent(messageInfo.content),
+        });
+
+        // Update chat's last message info if this is newer
+        const lastText = this.stringifyContent(messageInfo.content);
+        this.stmtUpsertChat.run({
+          jid: messageInfo.from,
+          name: messageInfo.pushName || null,
+          isGroup: messageInfo.isGroup ? 1 : (messageInfo.from?.endsWith('@g.us') ? 1 : 0),
+          unreadCount: null,
+          lastMessageTimestamp: Number(messageInfo.timestamp) || null,
+          lastMessageText: lastText,
+        });
+      }
+    });
+
+    try {
+      tx(messages);
+    } catch (e) {
+      errorLogger.error({ msg: 'SQLite saveMessagesBatch failed', error: (e as Error).message });
+    }
+  }
+
+  // Ping database to check connectivity
+  ping(): Promise<boolean> {
+    return new Promise((resolve) => {
+      try {
+        const stmt = this.db.prepare('SELECT 1');
+        stmt.run();
+        resolve(true);
+      } catch (e) {
+        errorLogger.error({ msg: 'SQLite ping failed', error: (e as Error).message });
+        resolve(false);
+      }
+    });
+  }
 }
 
 const store = new SQLiteStore();

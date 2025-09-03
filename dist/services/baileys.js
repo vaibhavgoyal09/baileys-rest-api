@@ -6,6 +6,7 @@ import { pino } from "pino";
 import fs from "fs/promises";
 import { logger, errorLogger } from "../utils/logger.js";
 import Store from "./sqliteStore.js";
+import ingestion from "./ingestion.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 class WhatsAppService {
@@ -148,12 +149,20 @@ class WhatsAppService {
                     await WhatsAppService.notifyWebhook("connection", {
                         status: "connected",
                     });
+                    if (isReconnecting) {
+                        try {
+                            await this.syncHistoryOnReconnect();
+                        }
+                        catch (e) {
+                            errorLogger.error({
+                                msg: "Error during manual history sync on reconnect",
+                                error: e?.message || e,
+                            });
+                        }
+                    }
                 }
             });
             this.sock.ev.on("creds.update", saveCreds);
-            this.sock.ev.on("messaging-history.set", (messageHistory) => {
-                console.log("On Message History", messageHistory);
-            });
             this.sock.ev.on("chats.set", ({ chats }) => {
                 try {
                     const list = chats || [];
@@ -236,11 +245,19 @@ class WhatsAppService {
                             };
                             if (info.id && info.from) {
                                 try {
-                                    Store.saveMessage(info);
+                                    const res = await ingestion.enqueueMessage(info);
+                                    if (!res.accepted) {
+                                        errorLogger.error({
+                                            msg: "Failed to enqueue history message",
+                                            error: res.reason,
+                                            idempotencyKey: res.idempotencyKey,
+                                            correlationId: res.correlationId,
+                                        });
+                                    }
                                 }
                                 catch (e) {
                                     errorLogger.error({
-                                        msg: "Failed to persist history message",
+                                        msg: "Failed to enqueue history message",
                                         error: e?.message || e,
                                     });
                                 }
@@ -335,11 +352,19 @@ class WhatsAppService {
                                 data: messageInfo,
                             });
                             try {
-                                Store.saveMessage(messageInfo);
+                                const res = await ingestion.enqueueMessage(messageInfo);
+                                if (!res.accepted) {
+                                    errorLogger.error({
+                                        msg: "Failed to enqueue incoming message",
+                                        error: res.reason,
+                                        idempotencyKey: res.idempotencyKey,
+                                        correlationId: res.correlationId,
+                                    });
+                                }
                             }
                             catch (e) {
                                 errorLogger.error({
-                                    msg: "Failed to persist incoming message",
+                                    msg: "Failed to enqueue incoming message",
                                     error: e?.message || e,
                                 });
                             }
@@ -569,6 +594,108 @@ class WhatsAppService {
             return [];
         }
     }
+    async delay(ms) {
+        await new Promise((resolve) => setTimeout(resolve, ms));
+    }
+    async syncHistoryForChat(jid, maxPages = 6, batch = 50) {
+        try {
+            let page = 0;
+            let anchor = Store.getOldestMessageAnchor(jid);
+            if (!anchor) {
+                logger.debug({
+                    msg: "No local messages to anchor history backfill, skipping chat",
+                    jid,
+                });
+                return;
+            }
+            let prevOldestId = anchor.key.id;
+            while (anchor && page < maxPages) {
+                logger.info({
+                    msg: "Fetching older history page",
+                    jid,
+                    page: page + 1,
+                    batch,
+                    anchorId: anchor.key.id,
+                    anchorTs: anchor.messageTimestamp,
+                });
+                try {
+                    await this.sock.fetchMessageHistory(batch, anchor.key, anchor.messageTimestamp);
+                }
+                catch (e) {
+                    errorLogger.error({
+                        msg: "fetchMessageHistory failed",
+                        jid,
+                        page,
+                        error: e?.message || e,
+                    });
+                    break;
+                }
+                await this.delay(500);
+                const newAnchor = Store.getOldestMessageAnchor(jid);
+                if (!newAnchor) {
+                    logger.debug({
+                        msg: "No more messages after fetch, stopping backfill",
+                        jid,
+                        page,
+                    });
+                    break;
+                }
+                if (newAnchor.key.id === prevOldestId) {
+                    logger.debug({
+                        msg: "Oldest anchor unchanged after fetch, stopping",
+                        jid,
+                        page,
+                        anchorId: prevOldestId,
+                    });
+                    break;
+                }
+                prevOldestId = newAnchor.key.id;
+                anchor = newAnchor;
+                page += 1;
+            }
+            logger.info({
+                msg: "Completed backfill for chat",
+                jid,
+                pagesFetched: page,
+            });
+        }
+        catch (e) {
+            errorLogger.error({
+                msg: "syncHistoryForChat error",
+                jid,
+                error: e?.message || e,
+            });
+        }
+    }
+    async syncHistoryOnReconnect() {
+        if (!this.sock || !this.isConnected) {
+            logger.warn("Cannot sync history on reconnect: socket not connected");
+            return;
+        }
+        try {
+            const conversations = Store.listConversations({ limit: 1000, cursor: null }) || [];
+            logger.info({
+                msg: "Starting history backfill on reconnect",
+                chatCount: conversations.length,
+            });
+            for (const conv of conversations) {
+                const jid = conv?.jid;
+                if (!jid)
+                    continue;
+                await this.syncHistoryForChat(jid, 6, 50);
+                await this.delay(200);
+            }
+            logger.info({
+                msg: "History backfill on reconnect completed",
+            });
+        }
+        catch (e) {
+            errorLogger.error({
+                msg: "syncHistoryOnReconnect failed",
+                error: e?.message || e,
+            });
+        }
+    }
     async sendMessage(to, message) {
         if (!this.isConnected) {
             throw new Error("WhatsApp connection is not active");
@@ -599,7 +726,15 @@ class WhatsAppService {
                     content: { type: "text", text: message },
                     isGroup: (jid || "").endsWith("@g.us"),
                 };
-                Store.saveMessage(messageInfo);
+                const res = await ingestion.enqueueMessage(messageInfo);
+                if (!res.accepted) {
+                    errorLogger.error({
+                        msg: "Failed to enqueue outgoing message",
+                        error: res.reason,
+                        idempotencyKey: res.idempotencyKey,
+                        correlationId: res.correlationId,
+                    });
+                }
             }
             catch (e) {
                 errorLogger.error({

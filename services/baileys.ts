@@ -11,6 +11,7 @@ import { pino } from "pino";
 import fs from "fs/promises";
 import { logger, errorLogger } from "../utils/logger.js";
 import Store, { Chat } from "./sqliteStore.js";
+import ingestion from "./ingestion.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -219,6 +220,18 @@ class WhatsAppService {
             status: "connected",
           });
 
+          // on reconnect, explicitly backfill message history for chats
+          if (isReconnecting) {
+            try {
+              await this.syncHistoryOnReconnect();
+            } catch (e) {
+              errorLogger.error({
+                msg: "Error during manual history sync on reconnect",
+                error: (e as Error)?.message || e,
+              });
+            }
+          }
+
           // hydrate SQLite from in-memory store immediately and once again after a short delay
           // try {
           //   await this.syncChatsFromStore();
@@ -231,12 +244,8 @@ class WhatsAppService {
 
       this.sock.ev.on("creds.update", saveCreds);
 
-      this.sock.ev.on(
-        "messaging-history.set",
-        (messageHistory: any) => {
-          
-        }
-      );
+      // removed duplicate empty handler for messaging-history.set (handled below with processHistory)
+      
 
       this.sock.ev.on("chats.set", ({ chats }: any) => {
         try {
@@ -327,10 +336,18 @@ class WhatsAppService {
 
               if (info.id && info.from) {
                 try {
-                  Store.saveMessage(info);
+                  const res = await ingestion.enqueueMessage(info);
+                  if (!res.accepted) {
+                    errorLogger.error({
+                      msg: "Failed to enqueue history message",
+                      error: res.reason,
+                      idempotencyKey: res.idempotencyKey,
+                      correlationId: res.correlationId,
+                    });
+                  }
                 } catch (e) {
                   errorLogger.error({
-                    msg: "Failed to persist history message",
+                    msg: "Failed to enqueue history message",
                     error: (e as Error)?.message || e,
                   });
                 }
@@ -435,12 +452,20 @@ class WhatsAppService {
                   data: messageInfo,
                 });
 
-                // Persist to store
+                // Enqueue to ingestion service
                 try {
-                  Store.saveMessage(messageInfo);
+                  const res = await ingestion.enqueueMessage(messageInfo);
+                  if (!res.accepted) {
+                    errorLogger.error({
+                      msg: "Failed to enqueue incoming message",
+                      error: res.reason,
+                      idempotencyKey: res.idempotencyKey,
+                      correlationId: res.correlationId,
+                    });
+                  }
                 } catch (e) {
                   errorLogger.error({
-                    msg: "Failed to persist incoming message",
+                    msg: "Failed to enqueue incoming message",
                     error: (e as Error)?.message || e,
                   });
                 }
@@ -711,6 +736,127 @@ class WhatsAppService {
     }
   }
 
+  // small helper to pause between paginated fetches
+  private async delay(ms: number): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  // paginate older history for a single chat using fetchMessageHistory (<=50 per page)
+  private async syncHistoryForChat(jid: string, maxPages = 6, batch = 50): Promise<void> {
+    try {
+      let page = 0;
+      // we require an oldest anchor to go further back in history
+      let anchor = Store.getOldestMessageAnchor(jid);
+      if (!anchor) {
+        logger.debug({
+          msg: "No local messages to anchor history backfill, skipping chat",
+          jid,
+        });
+        return;
+      }
+
+      let prevOldestId = anchor.key.id;
+
+      while (anchor && page < maxPages) {
+        logger.info({
+          msg: "Fetching older history page",
+          jid,
+          page: page + 1,
+          batch,
+          anchorId: anchor.key.id,
+          anchorTs: anchor.messageTimestamp,
+        });
+
+        try {
+          // messages will arrive via `messaging.history-set` and be persisted by our handler
+          await this.sock.fetchMessageHistory(batch, anchor.key, anchor.messageTimestamp);
+        } catch (e) {
+          errorLogger.error({
+            msg: "fetchMessageHistory failed",
+            jid,
+            page,
+            error: (e as Error)?.message || e,
+          });
+          break;
+        }
+
+        // wait a bit for events to arrive & persist
+        await this.delay(500);
+
+        // compute new oldest anchor after persist
+        const newAnchor = Store.getOldestMessageAnchor(jid);
+        if (!newAnchor) {
+          logger.debug({
+            msg: "No more messages after fetch, stopping backfill",
+            jid,
+            page,
+          });
+          break;
+        }
+
+        if (newAnchor.key.id === prevOldestId) {
+          // did not move further back => nothing older (or rate limited)
+          logger.debug({
+            msg: "Oldest anchor unchanged after fetch, stopping",
+            jid,
+            page,
+            anchorId: prevOldestId,
+          });
+          break;
+        }
+
+        prevOldestId = newAnchor.key.id;
+        anchor = newAnchor;
+        page += 1;
+      }
+
+      logger.info({
+        msg: "Completed backfill for chat",
+        jid,
+        pagesFetched: page,
+      });
+    } catch (e) {
+      errorLogger.error({
+        msg: "syncHistoryForChat error",
+        jid,
+        error: (e as Error)?.message || e,
+      });
+    }
+  }
+
+  // trigger history backfill for many chats on reconnect
+  async syncHistoryOnReconnect(): Promise<void> {
+    if (!this.sock || !this.isConnected) {
+      logger.warn("Cannot sync history on reconnect: socket not connected");
+      return;
+    }
+    try {
+      const conversations = Store.listConversations({ limit: 1000, cursor: null }) || [];
+      logger.info({
+        msg: "Starting history backfill on reconnect",
+        chatCount: conversations.length,
+      });
+
+      // sequential to avoid flooding
+      for (const conv of conversations) {
+        const jid = conv?.jid;
+        if (!jid) continue;
+        await this.syncHistoryForChat(jid, 6, 50);
+        // small pause between chats
+        await this.delay(200);
+      }
+
+      logger.info({
+        msg: "History backfill on reconnect completed",
+      });
+    } catch (e) {
+      errorLogger.error({
+        msg: "syncHistoryOnReconnect failed",
+        error: (e as Error)?.message || e,
+      });
+    }
+  }
+
   async sendMessage(to: string, message: string): Promise<any> {
     if (!this.isConnected) {
       throw new Error("WhatsApp connection is not active");
@@ -747,7 +893,15 @@ class WhatsAppService {
           content: { type: "text", text: message },
           isGroup: (jid || "").endsWith("@g.us"),
         };
-        Store.saveMessage(messageInfo);
+        const res = await ingestion.enqueueMessage(messageInfo);
+        if (!res.accepted) {
+          errorLogger.error({
+            msg: "Failed to enqueue outgoing message",
+            error: res.reason,
+            idempotencyKey: res.idempotencyKey,
+            correlationId: res.correlationId,
+          });
+        }
       } catch (e) {
         errorLogger.error({
           msg: "Failed to persist outgoing message",
