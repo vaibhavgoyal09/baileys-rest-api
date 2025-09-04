@@ -181,6 +181,17 @@ class SQLiteStore {
     try {
       const lastText = this.stringifyContent(messageInfo.content);
 
+      // Ensure chat exists first and update last message info
+      this.stmtUpsertChat.run({
+        jid: messageInfo.from,
+        name: messageInfo.pushName || null,
+        isGroup: messageInfo.isGroup ? 1 : (messageInfo.from?.endsWith('@g.us') ? 1 : 0),
+        unreadCount: null,
+        lastMessageTimestamp: Number(messageInfo.timestamp) || null,
+        lastMessageText: lastText,
+      });
+
+      // Then insert the message (avoids FK constraint issues if enabled)
       this.stmtInsertMessage.run({
         id: messageInfo.id,
         jid: messageInfo.from,
@@ -189,16 +200,6 @@ class SQLiteStore {
         type: messageInfo.type || null,
         pushName: messageInfo.pushName || null,
         content: lastText,
-      });
-
-      // Ensure chat exists and update last message info
-      this.stmtUpsertChat.run({
-        jid: messageInfo.from,
-        name: messageInfo.pushName || null,
-        isGroup: messageInfo.isGroup ? 1 : (messageInfo.from?.endsWith('@g.us') ? 1 : 0),
-        unreadCount: null,
-        lastMessageTimestamp: Number(messageInfo.timestamp) || null,
-        lastMessageText: lastText,
       });
     } catch (e) {
       errorLogger.error({ msg: 'SQLite saveMessage failed', error: (e as Error).message });
@@ -323,8 +324,19 @@ class SQLiteStore {
     const tx = this.db.transaction((rows: (MessageInfo & { idempotencyKey: string })[]) => {
       for (const message of rows) {
         const { idempotencyKey, ...messageInfo } = message;
-        
-        // Insert message with idempotency key
+
+        // Upsert chat first to guarantee parent row exists
+        const lastText = this.stringifyContent(messageInfo.content);
+        this.stmtUpsertChat.run({
+          jid: messageInfo.from,
+          name: messageInfo.pushName || null,
+          isGroup: messageInfo.isGroup ? 1 : (messageInfo.from?.endsWith('@g.us') ? 1 : 0),
+          unreadCount: null,
+          lastMessageTimestamp: Number(messageInfo.timestamp) || null,
+          lastMessageText: lastText,
+        });
+
+        // Then insert message with idempotency
         this.db.prepare(`
           INSERT OR IGNORE INTO messages (
             id, jid, fromMe, timestamp, type, pushName, content
@@ -336,18 +348,7 @@ class SQLiteStore {
           timestamp: Number(messageInfo.timestamp) || null,
           type: messageInfo.type || null,
           pushName: messageInfo.pushName || null,
-          content: this.stringifyContent(messageInfo.content),
-        });
-
-        // Update chat's last message info if this is newer
-        const lastText = this.stringifyContent(messageInfo.content);
-        this.stmtUpsertChat.run({
-          jid: messageInfo.from,
-          name: messageInfo.pushName || null,
-          isGroup: messageInfo.isGroup ? 1 : (messageInfo.from?.endsWith('@g.us') ? 1 : 0),
-          unreadCount: null,
-          lastMessageTimestamp: Number(messageInfo.timestamp) || null,
-          lastMessageText: lastText,
+          content: lastText,
         });
       }
     });
