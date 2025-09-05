@@ -1,652 +1,760 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Baileys Session Manager</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }
-        h1 {
-            color: #333;
-            text-align: center;
-        }
-        .container {
-            background-color: white;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 8px 28px rgba(0,0,0,0.12);
-            border: 1px solid #eaeaea;
-        }
-        .form-group {
-            margin-bottom: 15px;
-        }
-        .section {
-            border: 1px solid #eef0f3;
-            padding: 16px;
-            border-radius: 10px;
-            margin: 18px 0;
-            background: linear-gradient(180deg, #ffffff 0%, #fafbfc 100%);
-        }
-        .section h2 {
-            margin-top: 0;
-            font-size: 20px;
-            color: #1f2d3d;
-        }
-        .grid-2 {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 14px;
-        }
-        .muted {
-            color: #6b7280;
-            font-size: 12px;
-        }
-        .btn-row {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            margin-top: 8px;
-        }
-        .pill {
-            border-radius: 9999px;
-        }
-        .card {
-            background: #ffffff;
-            border: 1px solid #eef0f3;
-            border-radius: 8px;
-            padding: 12px;
-        }
-        .info-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 4px 10px;
-            border-radius: 999px;
-            background: #eef6ff;
-            color: #0b5ed7;
-            font-size: 12px;
-            border: 1px solid #d6e8ff;
-        }
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
-        }
-        input, textarea {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-        button {
-            padding: 10px 20px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            margin-right: 10px;
-        }
-        button:hover {
-            background-color: #0056b3;
-        }
-        button:disabled {
-            background-color: #ccc;
-            cursor: not-allowed;
-        }
-        .response {
-            margin-top: 20px;
-            padding: 15px;
-            border-radius: 4px;
-            white-space: pre-wrap;
-        }
-        .success {
-            background-color: #d4edda;
-            border: 1px solid #c3e6cb;
-            color: #155724;
-        }
-        .error {
-            background-color: #f8d7da;
-            border: 1px solid #f5c6cb;
-            color: #721c24;
-        }
-        .qr-container {
-            text-align: center;
-            margin-top: 20px;
-        }
-        #qr-code {
-            max-width: 200px;
-            margin: 0 auto;
-        }
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #f5f5f5;
+      }
+      h1 {
+        color: #333;
+        text-align: center;
+      }
+      .container {
+        background-color: white;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);
+        border: 1px solid #eaeaea;
+      }
+      .form-group {
+        margin-bottom: 15px;
+      }
+      .section {
+        border: 1px solid #eef0f3;
+        padding: 16px;
+        border-radius: 10px;
+        margin: 18px 0;
+        background: linear-gradient(180deg, #ffffff 0%, #fafbfc 100%);
+      }
+      .section h2 {
+        margin-top: 0;
+        font-size: 20px;
+        color: #1f2d3d;
+      }
+      .grid-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+      }
+      .muted {
+        color: #6b7280;
+        font-size: 12px;
+      }
+      .btn-row {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 8px;
+      }
+      .pill {
+        border-radius: 9999px;
+      }
+      .card {
+        background: #ffffff;
+        border: 1px solid #eef0f3;
+        border-radius: 8px;
+        padding: 12px;
+      }
+      .info-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: #eef6ff;
+        color: #0b5ed7;
+        font-size: 12px;
+        border: 1px solid #d6e8ff;
+      }
+      label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+      }
+      input,
+      textarea {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+      button {
+        padding: 10px 20px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        margin-right: 10px;
+      }
+      button:hover {
+        background-color: #0056b3;
+      }
+      button:disabled {
+        background-color: #ccc;
+        cursor: not-allowed;
+      }
+      .response {
+        margin-top: 20px;
+        padding: 15px;
+        border-radius: 4px;
+        white-space: pre-wrap;
+      }
+      .success {
+        background-color: #d4edda;
+        border: 1px solid #c3e6cb;
+        color: #155724;
+      }
+      .error {
+        background-color: #f8d7da;
+        border: 1px solid #f5c6cb;
+        color: #721c24;
+      }
+      .qr-container {
+        text-align: center;
+        margin-top: 20px;
+      }
+      #qr-code {
+        max-width: 200px;
+        margin: 0 auto;
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <h1>Baileys Session Manager</h1>
     <div class="container">
-        <div class="form-group">
-            <label for="api-url">API Server URL:</label>
-            <input type="text" id="api-url" value="http://localhost:3001">
-        </div>
-        <div class="form-group">
-            <label>Current Tenant:</label>
-            <div id="current-tenant" style="padding: 8px; background-color: #eef6ff; border-radius: 4px; border: 1px solid #d6e8ff;"></div>
-        </div>
-        <div class="btn-row" style="margin-bottom: 20px;">
-            <button id="start-btn">Start Session</button>
-            <button id="status-btn">Check Status</button>
-            <button id="logout-btn">Logout</button>
-            <button id="user-management-btn" style="background-color: #6c757d;">User Management</button>
+      <div class="form-group">
+        <label for="api-url">API Server URL:</label>
+        <input type="text" id="api-url" value="http://localhost:3001" />
+      </div>
+      <div class="form-group">
+        <label>Current Tenant:</label>
+        <div
+          id="current-tenant"
+          style="
+            padding: 8px;
+            background-color: #eef6ff;
+            border-radius: 4px;
+            border: 1px solid #d6e8ff;
+          "
+        ></div>
+      </div>
+      <div class="btn-row" style="margin-bottom: 20px">
+        <button id="start-btn">Start Session</button>
+        <button id="status-btn">Check Status</button>
+        <button id="logout-btn">Logout</button>
+        <button id="user-management-btn" style="background-color: #6c757d">
+          User Management
+        </button>
+      </div>
+
+      <div class="section">
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+          "
+        >
+          <h2 style="margin: 0; display: flex; align-items: center; gap: 8px">
+            Business Profile
+            <span class="info-badge">Manage your public info</span>
+          </h2>
+          <div class="btn-row">
+            <button
+              id="business-load-btn"
+              class="pill"
+              title="Load saved business info"
+            >
+              Load
+            </button>
+            <button
+              id="business-refresh-btn"
+              class="pill"
+              title="Auto-fetch from WhatsApp (if available)"
+            >
+              Auto-Fetch
+            </button>
+            <button id="business-save-btn" class="pill" title="Save changes">
+              Save
+            </button>
+          </div>
         </div>
 
-        <div class="section">
-            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
-              <h2 style="margin:0;display:flex;align-items:center;gap:8px;">
-                Business Profile
-                <span class="info-badge">Manage your public info</span>
-              </h2>
-              <div class="btn-row">
-                <button id="business-load-btn" class="pill" title="Load saved business info">Load</button>
-                <button id="business-refresh-btn" class="pill" title="Auto-fetch from WhatsApp (if available)">Auto-Fetch</button>
-                <button id="business-save-btn" class="pill" title="Save changes">Save</button>
-              </div>
+        <div class="grid-2" style="margin-top: 12px">
+          <div class="form-group">
+            <label for="biz-name">Business Name</label>
+            <input id="biz-name" type="text" placeholder="Your business name" />
+          </div>
+          <div class="form-group">
+            <label for="biz-website">Website URL</label>
+            <input
+              id="biz-website"
+              type="url"
+              placeholder="https://example.com"
+            />
+          </div>
+          <div class="form-group">
+            <label for="biz-instagram">Instagram Profile URL</label>
+            <input
+              id="biz-instagram"
+              type="url"
+              placeholder="https://instagram.com/yourhandle"
+            />
+          </div>
+          <div class="form-group">
+            <label for="biz-location">Location URL</label>
+            <input id="biz-location" type="url" placeholder="Google Maps URL" />
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="form-group">
+            <label for="biz-working-hours">Working Hours</label>
+            <textarea
+              id="biz-working-hours"
+              rows="3"
+              placeholder="Mon-Fri 9:00 AM - 6:00 PM"
+            ></textarea>
+            <div class="muted">
+              You can also paste JSON for structured hours.
             </div>
-
-            <div class="grid-2" style="margin-top:12px;">
-              <div class="form-group">
-                <label for="biz-name">Business Name</label>
-                <input id="biz-name" type="text" placeholder="Your business name">
-              </div>
-              <div class="form-group">
-                <label for="biz-website">Website URL</label>
-                <input id="biz-website" type="url" placeholder="https://example.com">
-              </div>
-              <div class="form-group">
-                <label for="biz-instagram">Instagram Profile URL</label>
-                <input id="biz-instagram" type="url" placeholder="https://instagram.com/yourhandle">
-              </div>
-              <div class="form-group">
-                <label for="biz-location">Location URL</label>
-                <input id="biz-location" type="url" placeholder="Google Maps URL">
-              </div>
-            </div>
-
-            <div class="grid-2">
-              <div class="form-group">
-                <label for="biz-working-hours">Working Hours</label>
-                <textarea id="biz-working-hours" rows="3" placeholder="Mon-Fri 9:00 AM - 6:00 PM"></textarea>
-                <div class="muted">You can also paste JSON for structured hours.</div>
-              </div>
-              <div class="form-group">
-                <label for="biz-shipping">Shipping Details</label>
-                <textarea id="biz-shipping" rows="3" placeholder="Free shipping over $50. Delivery within 3-5 days."></textarea>
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label for="biz-mobiles">Mobile Numbers</label>
-              <input id="biz-mobiles" type="text" placeholder="+919999999999, +14155552671">
-              <div class="muted">Comma-separated. Digits with optional + prefix.</div>
-            </div>
-
-            <div id="business-status" class="card" style="display:none;"></div>
+          </div>
+          <div class="form-group">
+            <label for="biz-shipping">Shipping Details</label>
+            <textarea
+              id="biz-shipping"
+              rows="3"
+              placeholder="Free shipping over $50. Delivery within 3-5 days."
+            ></textarea>
+          </div>
         </div>
 
-        <h2>Send Messages</h2>
         <div class="form-group">
-            <label for="phone-number">Phone Number:</label>
-            <input type="text" id="phone-number" placeholder="e.g. 1234567890 or 1234567890@whatsapp.net">
+          <label for="biz-mobiles">Mobile Numbers</label>
+          <input
+            id="biz-mobiles"
+            type="text"
+            placeholder="+919999999999, +14155552671"
+          />
+          <div class="muted">
+            Comma-separated. Digits with optional + prefix.
+          </div>
         </div>
-        <div class="form-group">
-            <label for="message-text">Message:</label>
-            <textarea id="message-text" rows="3" placeholder="Enter your message"></textarea>
-        </div>
-        <button id="check-num-btn">Check Number</button>
-        <button id="send-msg-btn">Send Message</button>
 
-        <h2>Conversations</h2>
-        <button id="fetch-conversations-btn">Fetch All Conversations</button>
+        <div id="business-status" class="card" style="display: none"></div>
+      </div>
 
-        <h2>Messages</h2>
-        <div class="form-group">
-            <label for="conversation-jid">Conversation JID:</label>
-            <input type="text" id="conversation-jid" placeholder="e.g. 1234567890@s.whatsapp.net">
-        </div>
-        <button id="fetch-messages-btn">Fetch Messages</button>
+      <h2>Send Messages</h2>
+      <div class="form-group">
+        <label for="phone-number">Phone Number:</label>
+        <input
+          type="text"
+          id="phone-number"
+          placeholder="e.g. 1234567890 or 1234567890@whatsapp.net"
+        />
+      </div>
+      <div class="form-group">
+        <label for="message-text">Message:</label>
+        <textarea
+          id="message-text"
+          rows="3"
+          placeholder="Enter your message"
+        ></textarea>
+      </div>
+      <button id="check-num-btn">Check Number</button>
+      <button id="send-msg-btn">Send Message</button>
 
-        <div id="response-container"></div>
+      <h2>Conversations</h2>
+      <button id="fetch-conversations-btn">Fetch All Conversations</button>
+
+      <h2>Messages</h2>
+      <div class="form-group">
+        <label for="conversation-jid">Conversation JID:</label>
+        <input
+          type="text"
+          id="conversation-jid"
+          placeholder="e.g. 1234567890@s.whatsapp.net"
+        />
+      </div>
+      <button id="fetch-messages-btn">Fetch Messages</button>
+
+      <div id="response-container"></div>
     </div>
 
     <script>
-        const apiUrlInput = document.getElementById('api-url');
-        const currentTenantDisplay = document.getElementById('current-tenant');
-        const startBtn = document.getElementById('start-btn');
-        const statusBtn = document.getElementById('status-btn');
-        const logoutBtn = document.getElementById('logout-btn');
-        const phoneNumberInput = document.getElementById('phone-number');
-        const messageTextInput = document.getElementById('message-text');
-        const checkNumBtn = document.getElementById('check-num-btn');
-        const sendMsgBtn = document.getElementById('send-msg-btn');
-        const fetchConversationsBtn = document.getElementById('fetch-conversations-btn');
-        const conversationJidInput = document.getElementById('conversation-jid');
-        const fetchMessagesBtn = document.getElementById('fetch-messages-btn');
-        const responseContainer = document.getElementById('response-container');
-        const userManagementBtn = document.getElementById('user-management-btn');
+      const apiUrlInput = document.getElementById("api-url");
+      const currentTenantDisplay = document.getElementById("current-tenant");
+      const startBtn = document.getElementById("start-btn");
+      const statusBtn = document.getElementById("status-btn");
+      const logoutBtn = document.getElementById("logout-btn");
+      const phoneNumberInput = document.getElementById("phone-number");
+      const messageTextInput = document.getElementById("message-text");
+      const checkNumBtn = document.getElementById("check-num-btn");
+      const sendMsgBtn = document.getElementById("send-msg-btn");
+      const fetchConversationsBtn = document.getElementById(
+        "fetch-conversations-btn",
+      );
+      const conversationJidInput = document.getElementById("conversation-jid");
+      const fetchMessagesBtn = document.getElementById("fetch-messages-btn");
+      const responseContainer = document.getElementById("response-container");
+      const userManagementBtn = document.getElementById("user-management-btn");
 
-        // Business Info Elements
-        const businessLoadBtn = document.getElementById('business-load-btn');
-        const businessSaveBtn = document.getElementById('business-save-btn');
-        const businessRefreshBtn = document.getElementById('business-refresh-btn');
+      // Business Info Elements
+      const businessLoadBtn = document.getElementById("business-load-btn");
+      const businessSaveBtn = document.getElementById("business-save-btn");
+      const businessRefreshBtn = document.getElementById(
+        "business-refresh-btn",
+      );
 
-        const bizName = document.getElementById('biz-name');
-        const bizWebsite = document.getElementById('biz-website');
-        const bizInstagram = document.getElementById('biz-instagram');
-        const bizLocation = document.getElementById('biz-location');
-        const bizWorkingHours = document.getElementById('biz-working-hours');
-        const bizShipping = document.getElementById('biz-shipping');
-        const bizMobiles = document.getElementById('biz-mobiles');
-        const businessStatus = document.getElementById('business-status');
+      const bizName = document.getElementById("biz-name");
+      const bizWebsite = document.getElementById("biz-website");
+      const bizInstagram = document.getElementById("biz-instagram");
+      const bizLocation = document.getElementById("biz-location");
+      const bizWorkingHours = document.getElementById("biz-working-hours");
+      const bizShipping = document.getElementById("biz-shipping");
+      const bizMobiles = document.getElementById("biz-mobiles");
+      const businessStatus = document.getElementById("business-status");
 
-        function getAuthHeaders() {
-            const token = localStorage.getItem('jwtToken');
-            if (!token) {
-                alert('Please login first');
-                window.location.href = 'login.html';
-                return null;
-            }
-            return {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            };
+      function getAuthHeaders() {
+        const token = localStorage.getItem("jwtToken");
+        if (!token) {
+          alert("Please login first");
+          window.location.href = "login.html";
+          return null;
+        }
+        return {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        };
+      }
+
+      function showResponse(data, isError = false) {
+        responseContainer.innerHTML = "";
+        const responseDiv = document.createElement("div");
+        responseDiv.className = `response ${isError ? "error" : "success"}`;
+
+        let content = "";
+        if (data.qrBase64) {
+          const qrImg = document.createElement("img");
+          qrImg.id = "qr-code";
+          qrImg.src = data.qrBase64;
+          qrImg.alt = "QR Code";
+          responseContainer.appendChild(qrImg);
+          content += "QR Code generated. Scan to connect.\n\n";
         }
 
-        function showResponse(data, isError = false) {
-            responseContainer.innerHTML = '';
-            const responseDiv = document.createElement('div');
-            responseDiv.className = `response ${isError ? 'error' : 'success'}`;
-
-            let content = '';
-            if (data.qrBase64) {
-                const qrImg = document.createElement('img');
-                qrImg.id = 'qr-code';
-                qrImg.src = data.qrBase64;
-                qrImg.alt = 'QR Code';
-                responseContainer.appendChild(qrImg);
-                content += 'QR Code generated. Scan to connect.\n\n';
-            }
-
-            if (typeof data === 'string') {
-                content += data;
-            } else {
-                content += JSON.stringify(data, null, 2);
-            }
-
-            responseDiv.textContent = content;
-            responseContainer.appendChild(responseDiv);
+        if (typeof data === "string") {
+          content += data;
+        } else {
+          content += JSON.stringify(data, null, 2);
         }
 
-        function showBusinessStatus(msg, isError = false) {
-            businessStatus.style.display = 'block';
-            businessStatus.style.borderColor = isError ? '#f5c6cb' : '#c3e6cb';
-            businessStatus.style.background = isError ? '#f8d7da' : '#d4edda';
-            businessStatus.style.color = isError ? '#721c24' : '#155724';
-            businessStatus.textContent = (typeof msg === 'string') ? msg : JSON.stringify(msg, null, 2);
+        responseDiv.textContent = content;
+        responseContainer.appendChild(responseDiv);
+      }
+
+      function showBusinessStatus(msg, isError = false) {
+        businessStatus.style.display = "block";
+        businessStatus.style.borderColor = isError ? "#f5c6cb" : "#c3e6cb";
+        businessStatus.style.background = isError ? "#f8d7da" : "#d4edda";
+        businessStatus.style.color = isError ? "#721c24" : "#155724";
+        businessStatus.textContent =
+          typeof msg === "string" ? msg : JSON.stringify(msg, null, 2);
+      }
+
+      function toArray(text) {
+        if (!text) return null;
+        const parts = String(text)
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+        return parts.length ? parts : null;
+      }
+
+      function fromArray(arr) {
+        if (!arr) return "";
+        try {
+          return (arr || []).join(", ");
+        } catch {
+          return "";
+        }
+      }
+
+      startBtn.addEventListener("click", async () => {
+        const headers = getAuthHeaders();
+        if (!headers) return;
+
+        startBtn.disabled = true;
+        startBtn.textContent = "Starting...";
+
+        try {
+          const response = await fetch(
+            `${apiUrlInput.value}/api/session/start`,
+            {
+              method: "POST",
+              headers: headers,
+            },
+          );
+
+          const data = await response.json();
+          if (response.ok) {
+            showResponse(data);
+          } else {
+            showResponse(data, true);
+          }
+        } catch (error) {
+          showResponse("Network error: " + error.message, true);
         }
 
-        function toArray(text) {
-            if (!text) return null;
-            const parts = String(text).split(',').map(s => s.trim()).filter(Boolean);
-            return parts.length ? parts : null;
+        startBtn.disabled = false;
+        startBtn.textContent = "Start Session";
+      });
+
+      // Business: Load current info
+      businessLoadBtn.addEventListener("click", async () => {
+        const headers = getAuthHeaders();
+        if (!headers) return;
+
+        businessLoadBtn.disabled = true;
+        try {
+          const response = await fetch(`${apiUrlInput.value}/api/business`, {
+            headers,
+          });
+          const data = await response.json();
+          if (!response.ok) {
+            showBusinessStatus(data, true);
+          } else {
+            const info = data?.data || {};
+            bizName.value = info.name || "";
+            bizWebsite.value = info.website_url || "";
+            bizInstagram.value = info.instagram_url || "";
+            bizLocation.value = info.location_url || "";
+            bizWorkingHours.value = info.working_hours || "";
+            bizShipping.value = info.shipping_details || "";
+            bizMobiles.value = fromArray(info.mobile_numbers);
+            showBusinessStatus("Loaded business info.");
+          }
+        } catch (e) {
+          showBusinessStatus("Network error: " + e.message, true);
+        }
+        businessLoadBtn.disabled = false;
+      });
+
+      // Business: Save
+      businessSaveBtn.addEventListener("click", async () => {
+        const headers = getAuthHeaders();
+        if (!headers) return;
+
+        businessSaveBtn.disabled = true;
+        try {
+          const payload = {
+            name: bizName.value || null,
+            working_hours: bizWorkingHours.value || null,
+            location_url: bizLocation.value || null,
+            shipping_details: bizShipping.value || null,
+            instagram_url: bizInstagram.value || null,
+            website_url: bizWebsite.value || null,
+            mobile_numbers: toArray(bizMobiles.value),
+          };
+          const response = await fetch(`${apiUrlInput.value}/api/business`, {
+            method: "PUT",
+            headers,
+            body: JSON.stringify(payload),
+          });
+          const data = await response.json();
+          if (!response.ok) {
+            showBusinessStatus(data, true);
+          } else {
+            showBusinessStatus("Business info saved successfully.");
+          }
+        } catch (e) {
+          showBusinessStatus("Network error: " + e.message, true);
+        }
+        businessSaveBtn.disabled = false;
+      });
+
+      // Business: Auto-Fetch from WhatsApp
+      businessRefreshBtn.addEventListener("click", async () => {
+        const headers = getAuthHeaders();
+        if (!headers) return;
+
+        businessRefreshBtn.disabled = true;
+        businessRefreshBtn.textContent = "Fetching...";
+        try {
+          const response = await fetch(
+            `${apiUrlInput.value}/api/business/refresh`,
+            {
+              method: "POST",
+              headers,
+            },
+          );
+          const data = await response.json();
+          if (!response.ok) {
+            showBusinessStatus(data, true);
+          } else {
+            const info = data?.stored || {};
+            bizName.value = info.name || "";
+            bizWebsite.value = info.website_url || "";
+            bizInstagram.value = info.instagram_url || "";
+            bizLocation.value = info.location_url || "";
+            bizWorkingHours.value = info.working_hours || "";
+            bizShipping.value = info.shipping_details || "";
+            bizMobiles.value = fromArray(info.mobile_numbers);
+            showBusinessStatus(
+              "Fetched and updated from WhatsApp (where available).",
+            );
+          }
+        } catch (e) {
+          showBusinessStatus("Network error: " + e.message, true);
+        }
+        businessRefreshBtn.disabled = false;
+        businessRefreshBtn.textContent = "Auto-Fetch";
+      });
+
+      statusBtn.addEventListener("click", async () => {
+        const headers = getAuthHeaders();
+        if (!headers) return;
+
+        statusBtn.disabled = true;
+        statusBtn.textContent = "Checking...";
+
+        try {
+          const response = await fetch(
+            `${apiUrlInput.value}/api/session/status`,
+            {
+              headers: headers,
+            },
+          );
+
+          const data = await response.json();
+          if (response.ok) {
+            showResponse(data);
+          } else {
+            showResponse(data, true);
+          }
+        } catch (error) {
+          showResponse("Network error: " + error.message, true);
         }
 
-        function fromArray(arr) {
-            if (!arr) return '';
-            try { return (arr || []).join(', '); } catch { return ''; }
+        statusBtn.disabled = false;
+        statusBtn.textContent = "Check Status";
+      });
+
+      logoutBtn.addEventListener("click", async () => {
+        const headers = getAuthHeaders();
+        if (!headers) return;
+
+        logoutBtn.disabled = true;
+        logoutBtn.textContent = "Logging out...";
+
+        try {
+          const response = await fetch(
+            `${apiUrlInput.value}/api/session/logout`,
+            {
+              method: "POST",
+              headers: headers,
+            },
+          );
+
+          const data = await response.json();
+          if (response.ok) {
+            showResponse(data);
+            // Clear local storage and redirect to login
+            localStorage.removeItem("jwtToken");
+            localStorage.removeItem("tenantId");
+            localStorage.removeItem("apiUrl");
+            setTimeout(() => {
+              window.location.href = "login.html";
+            }, 2000);
+          } else {
+            showResponse(data, true);
+          }
+        } catch (error) {
+          showResponse("Network error: " + error.message, true);
         }
 
-        startBtn.addEventListener('click', async () => {
-            const headers = getAuthHeaders();
-            if (!headers) return;
+        logoutBtn.disabled = false;
+        logoutBtn.textContent = "Logout";
+      });
 
-            startBtn.disabled = true;
-            startBtn.textContent = 'Starting...';
+      checkNumBtn.addEventListener("click", async () => {
+        const headers = getAuthHeaders();
+        if (!headers) return;
 
-            try {
-                const response = await fetch(`${apiUrlInput.value}/api/session/start`, {
-                    method: 'POST',
-                    headers: headers
-                });
+        const phoneNumber = phoneNumberInput.value.trim();
+        if (!phoneNumber) {
+          alert("Please enter a phone number");
+          return;
+        }
 
-                const data = await response.json();
-                if (response.ok) {
-                    showResponse(data);
-                } else {
-                    showResponse(data, true);
-                }
-            } catch (error) {
-                showResponse('Network error: ' + error.message, true);
-            }
+        checkNumBtn.disabled = true;
+        checkNumBtn.textContent = "Checking...";
 
-            startBtn.disabled = false;
-            startBtn.textContent = 'Start Session';
-        });
+        try {
+          const response = await fetch(
+            `${apiUrlInput.value}/api/message/check-number`,
+            {
+              method: "POST",
+              headers: headers,
+              body: JSON.stringify({ to: phoneNumber }),
+            },
+          );
 
-        // Business: Load current info
-        businessLoadBtn.addEventListener('click', async () => {
-            const headers = getAuthHeaders();
-            if (!headers) return;
+          const data = await response.json();
+          if (response.ok) {
+            showResponse(data);
+          } else {
+            showResponse(data, true);
+          }
+        } catch (error) {
+          showResponse("Network error: " + error.message, true);
+        }
 
-            businessLoadBtn.disabled = true;
-            try {
-                const response = await fetch(`${apiUrlInput.value}/api/business`, { headers });
-                const data = await response.json();
-                if (!response.ok) {
-                    showBusinessStatus(data, true);
-                } else {
-                    const info = data?.data || {};
-                    bizName.value = info.name || '';
-                    bizWebsite.value = info.website_url || '';
-                    bizInstagram.value = info.instagram_url || '';
-                    bizLocation.value = info.location_url || '';
-                    bizWorkingHours.value = info.working_hours || '';
-                    bizShipping.value = info.shipping_details || '';
-                    bizMobiles.value = fromArray(info.mobile_numbers);
-                    showBusinessStatus('Loaded business info.');
-                }
-            } catch (e) {
-                showBusinessStatus('Network error: ' + e.message, true);
-            }
-            businessLoadBtn.disabled = false;
-        });
+        checkNumBtn.disabled = false;
+        checkNumBtn.textContent = "Check Number";
+      });
 
-        // Business: Save
-        businessSaveBtn.addEventListener('click', async () => {
-            const headers = getAuthHeaders();
-            if (!headers) return;
+      sendMsgBtn.addEventListener("click", async () => {
+        const headers = getAuthHeaders();
+        if (!headers) return;
 
-            businessSaveBtn.disabled = true;
-            try {
-                const payload = {
-                    name: bizName.value || null,
-                    working_hours: bizWorkingHours.value || null,
-                    location_url: bizLocation.value || null,
-                    shipping_details: bizShipping.value || null,
-                    instagram_url: bizInstagram.value || null,
-                    website_url: bizWebsite.value || null,
-                    mobile_numbers: toArray(bizMobiles.value),
-                };
-                const response = await fetch(`${apiUrlInput.value}/api/business`, {
-                    method: 'PUT',
-                    headers,
-                    body: JSON.stringify(payload)
-                });
-                const data = await response.json();
-                if (!response.ok) {
-                    showBusinessStatus(data, true);
-                } else {
-                    showBusinessStatus('Business info saved successfully.');
-                }
-            } catch (e) {
-                showBusinessStatus('Network error: ' + e.message, true);
-            }
-            businessSaveBtn.disabled = false;
-        });
+        const phoneNumber = phoneNumberInput.value.trim();
+        const message = messageTextInput.value.trim();
 
-        // Business: Auto-Fetch from WhatsApp
-        businessRefreshBtn.addEventListener('click', async () => {
-            const headers = getAuthHeaders();
-            if (!headers) return;
+        if (!phoneNumber) {
+          alert("Please enter a phone number");
+          return;
+        }
+        if (!message) {
+          alert("Please enter a message");
+          return;
+        }
 
-            businessRefreshBtn.disabled = true;
-            businessRefreshBtn.textContent = 'Fetching...';
-            try {
-                const response = await fetch(`${apiUrlInput.value}/api/business/refresh`, {
-                    method: 'POST',
-                    headers
-                });
-                const data = await response.json();
-                if (!response.ok) {
-                    showBusinessStatus(data, true);
-                } else {
-                    const info = data?.stored || {};
-                    bizName.value = info.name || '';
-                    bizWebsite.value = info.website_url || '';
-                    bizInstagram.value = info.instagram_url || '';
-                    bizLocation.value = info.location_url || '';
-                    bizWorkingHours.value = info.working_hours || '';
-                    bizShipping.value = info.shipping_details || '';
-                    bizMobiles.value = fromArray(info.mobile_numbers);
-                    showBusinessStatus('Fetched and updated from WhatsApp (where available).');
-                }
-            } catch (e) {
-                showBusinessStatus('Network error: ' + e.message, true);
-            }
-            businessRefreshBtn.disabled = false;
-            businessRefreshBtn.textContent = 'Auto-Fetch';
-        });
+        sendMsgBtn.disabled = true;
+        sendMsgBtn.textContent = "Sending...";
 
-        statusBtn.addEventListener('click', async () => {
-            const headers = getAuthHeaders();
-            if (!headers) return;
+        try {
+          const response = await fetch(
+            `${apiUrlInput.value}/api/message/send-text`,
+            {
+              method: "POST",
+              headers: headers,
+              body: JSON.stringify({ to: phoneNumber, message: message }),
+            },
+          );
 
-            statusBtn.disabled = true;
-            statusBtn.textContent = 'Checking...';
+          const data = await response.json();
+          if (response.ok) {
+            showResponse(data);
+          } else {
+            showResponse(data, true);
+          }
+        } catch (error) {
+          showResponse("Network error: " + error.message, true);
+        }
 
-            try {
-                const response = await fetch(`${apiUrlInput.value}/api/session/status`, {
-                    headers: headers
-                });
+        sendMsgBtn.disabled = false;
+        sendMsgBtn.textContent = "Send Message";
+      });
 
-                const data = await response.json();
-                if (response.ok) {
-                    showResponse(data);
-                } else {
-                    showResponse(data, true);
-                }
-            } catch (error) {
-                showResponse('Network error: ' + error.message, true);
-            }
+      fetchConversationsBtn.addEventListener("click", async () => {
+        const headers = getAuthHeaders();
+        if (!headers) return;
 
-            statusBtn.disabled = false;
-            statusBtn.textContent = 'Check Status';
-        });
+        fetchConversationsBtn.disabled = true;
+        fetchConversationsBtn.textContent = "Fetching...";
 
-        logoutBtn.addEventListener('click', async () => {
-            const headers = getAuthHeaders();
-            if (!headers) return;
+        try {
+          const response = await fetch(
+            `${apiUrlInput.value}/api/message/conversations`,
+            {
+              headers: headers,
+            },
+          );
 
-            logoutBtn.disabled = true;
-            logoutBtn.textContent = 'Logging out...';
+          const data = await response.json();
+          if (response.ok) {
+            showResponse(data);
+          } else {
+            showResponse(data, true);
+          }
+        } catch (error) {
+          showResponse("Network error: " + error.message, true);
+        }
 
-            try {
-                const response = await fetch(`${apiUrlInput.value}/api/session/logout`, {
-                    method: 'POST',
-                    headers: headers
-                });
+        fetchConversationsBtn.disabled = false;
+        fetchConversationsBtn.textContent = "Fetch All Conversations";
+      });
 
-                const data = await response.json();
-                if (response.ok) {
-                    showResponse(data);
-                    // Clear local storage and redirect to login
-                    localStorage.removeItem('jwtToken');
-                    localStorage.removeItem('tenantId');
-                    localStorage.removeItem('apiUrl');
-                    setTimeout(() => {
-                        window.location.href = 'login.html';
-                    }, 2000);
-                } else {
-                    showResponse(data, true);
-                }
-            } catch (error) {
-                showResponse('Network error: ' + error.message, true);
-            }
+      fetchMessagesBtn.addEventListener("click", async () => {
+        const headers = getAuthHeaders();
+        if (!headers) return;
 
-            logoutBtn.disabled = false;
-            logoutBtn.textContent = 'Logout';
-        });
+        const jid = conversationJidInput.value.trim();
+        if (!jid) {
+          alert("Please enter a conversation JID");
+          return;
+        }
 
-        checkNumBtn.addEventListener('click', async () => {
-            const headers = getAuthHeaders();
-            if (!headers) return;
+        fetchMessagesBtn.disabled = true;
+        fetchMessagesBtn.textContent = "Fetching...";
 
-            const phoneNumber = phoneNumberInput.value.trim();
-            if (!phoneNumber) {
-                alert('Please enter a phone number');
-                return;
-            }
+        try {
+          const response = await fetch(
+            `${apiUrlInput.value}/api/message/messages?jid=${encodeURIComponent(jid)}`,
+            {
+              headers: headers,
+            },
+          );
 
-            checkNumBtn.disabled = true;
-            checkNumBtn.textContent = 'Checking...';
+          const data = await response.json();
+          if (response.ok) {
+            showResponse(data);
+          } else {
+            showResponse(data, true);
+          }
+        } catch (error) {
+          showResponse("Network error: " + error.message, true);
+        }
 
-            try {
-                const response = await fetch(`${apiUrlInput.value}/api/message/check-number`, {
-                    method: 'POST',
-                    headers: headers,
-                    body: JSON.stringify({ to: phoneNumber })
-                });
+        fetchMessagesBtn.disabled = false;
+        fetchMessagesBtn.textContent = "Fetch Messages";
+      });
 
-                const data = await response.json();
-                if (response.ok) {
-                    showResponse(data);
-                } else {
-                    showResponse(data, true);
-                }
-            } catch (error) {
-                showResponse('Network error: ' + error.message, true);
-            }
+      // User management navigation
+      userManagementBtn.addEventListener("click", () => {
+        window.location.href = "user-management.html";
+      });
 
-            checkNumBtn.disabled = false;
-            checkNumBtn.textContent = 'Check Number';
-        });
+      // Check authentication on page load
+      document.addEventListener("DOMContentLoaded", () => {
+        const token = localStorage.getItem("jwtToken");
+        const tenantId = localStorage.getItem("tenantId");
+        const savedApiUrl = localStorage.getItem("apiUrl");
 
-        sendMsgBtn.addEventListener('click', async () => {
-            const headers = getAuthHeaders();
-            if (!headers) return;
+        if (!token || !tenantId) {
+          alert("Please login first");
+          window.location.href = "login.html";
+          return;
+        }
 
-            const phoneNumber = phoneNumberInput.value.trim();
-            const message = messageTextInput.value.trim();
+        // Set API URL if saved
+        if (savedApiUrl) {
+          apiUrlInput.value = savedApiUrl;
+        }
 
-            if (!phoneNumber) {
-                alert('Please enter a phone number');
-                return;
-            }
-            if (!message) {
-                alert('Please enter a message');
-                return;
-            }
-
-            sendMsgBtn.disabled = true;
-            sendMsgBtn.textContent = 'Sending...';
-
-            try {
-                const response = await fetch(`${apiUrlInput.value}/api/message/send-text`, {
-                    method: 'POST',
-                    headers: headers,
-                    body: JSON.stringify({ to: phoneNumber, message: message })
-                });
-
-                const data = await response.json();
-                if (response.ok) {
-                    showResponse(data);
-                } else {
-                    showResponse(data, true);
-                }
-            } catch (error) {
-                showResponse('Network error: ' + error.message, true);
-            }
-
-            sendMsgBtn.disabled = false;
-            sendMsgBtn.textContent = 'Send Message';
-        });
-
-        fetchConversationsBtn.addEventListener('click', async () => {
-            const headers = getAuthHeaders();
-            if (!headers) return;
-
-            fetchConversationsBtn.disabled = true;
-            fetchConversationsBtn.textContent = 'Fetching...';
-
-            try {
-                const response = await fetch(`${apiUrlInput.value}/api/message/conversations`, {
-                    headers: headers
-                });
-
-                const data = await response.json();
-                if (response.ok) {
-                    showResponse(data);
-                } else {
-                    showResponse(data, true);
-                }
-            } catch (error) {
-                showResponse('Network error: ' + error.message, true);
-            }
-
-            fetchConversationsBtn.disabled = false;
-            fetchConversationsBtn.textContent = 'Fetch All Conversations';
-        });
-
-        fetchMessagesBtn.addEventListener('click', async () => {
-            const headers = getAuthHeaders();
-            if (!headers) return;
-
-            const jid = conversationJidInput.value.trim();
-            if (!jid) {
-                alert('Please enter a conversation JID');
-                return;
-            }
-
-            fetchMessagesBtn.disabled = true;
-            fetchMessagesBtn.textContent = 'Fetching...';
-
-            try {
-                const response = await fetch(`${apiUrlInput.value}/api/message/messages?jid=${encodeURIComponent(jid)}`, {
-                    headers: headers
-                });
-
-                const data = await response.json();
-                if (response.ok) {
-                    showResponse(data);
-                } else {
-                    showResponse(data, true);
-                }
-            } catch (error) {
-                showResponse('Network error: ' + error.message, true);
-            }
-
-            fetchMessagesBtn.disabled = false;
-            fetchMessagesBtn.textContent = 'Fetch Messages';
-        });
-
-        // User management navigation
-        userManagementBtn.addEventListener('click', () => {
-            window.location.href = 'user-management.html';
-        });
-
-        // Check authentication on page load
-        document.addEventListener('DOMContentLoaded', () => {
-            const token = localStorage.getItem('jwtToken');
-            const tenantId = localStorage.getItem('tenantId');
-            const savedApiUrl = localStorage.getItem('apiUrl');
-            
-            if (!token || !tenantId) {
-                alert('Please login first');
-                window.location.href = 'login.html';
-                return;
-            }
-
-            // Set API URL if saved
-            if (savedApiUrl) {
-                apiUrlInput.value = savedApiUrl;
-            }
-
-            // Display current tenant
-            currentTenantDisplay.textContent = tenantId;
-        });
+        // Display current tenant
+        currentTenantDisplay.textContent = tenantId;
+      });
     </script>
-</body>
+  </body>
 </html>

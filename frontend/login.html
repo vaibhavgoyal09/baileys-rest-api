@@ -1,318 +1,353 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Baileys REST API - Login</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 400px;
-            margin: 0 auto;
-            padding: 40px 20px;
-            background-color: #f5f5f5;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-        }
-        .login-container {
-            background-color: white;
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 8px 28px rgba(0,0,0,0.12);
-            border: 1px solid #eaeaea;
-            width: 100%;
-        }
-        h1 {
-            color: #333;
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        .form-group {
-            margin-bottom: 20px;
-        }
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
-            color: #333;
-        }
-        input {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            font-size: 16px;
-            box-sizing: border-box;
-        }
-        input:focus {
-            outline: none;
-            border-color: #007bff;
-            box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
-        }
-        button {
-            width: 100%;
-            padding: 12px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 16px;
-            font-weight: bold;
-            margin-top: 10px;
-        }
-        button:hover {
-            background-color: #0056b3;
-        }
-        button:disabled {
-            background-color: #ccc;
-            cursor: not-allowed;
-        }
-        .tabs {
-            display: flex;
-            margin-bottom: 20px;
-            border-bottom: 1px solid #eee;
-        }
-        .tab {
-            flex: 1;
-            padding: 10px;
-            text-align: center;
-            cursor: pointer;
-            border-bottom: 2px solid transparent;
-        }
-        .tab.active {
-            border-bottom-color: #007bff;
-            color: #007bff;
-            font-weight: bold;
-        }
-        .tab-content {
-            display: none;
-        }
-        .tab-content.active {
-            display: block;
-        }
-        .error {
-            color: #dc3545;
-            font-size: 14px;
-            margin-top: 5px;
-            display: none;
-        }
-        .success {
-            color: #28a745;
-            font-size: 14px;
-            margin-top: 5px;
-            display: none;
-        }
-        .api-url-group {
-            margin-bottom: 15px;
-        }
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 400px;
+        margin: 0 auto;
+        padding: 40px 20px;
+        background-color: #f5f5f5;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+      }
+      .login-container {
+        background-color: white;
+        padding: 30px;
+        border-radius: 12px;
+        box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);
+        border: 1px solid #eaeaea;
+        width: 100%;
+      }
+      h1 {
+        color: #333;
+        text-align: center;
+        margin-bottom: 30px;
+      }
+      .form-group {
+        margin-bottom: 20px;
+      }
+      label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+        color: #333;
+      }
+      input {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        font-size: 16px;
+        box-sizing: border-box;
+      }
+      input:focus {
+        outline: none;
+        border-color: #007bff;
+        box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+      }
+      button {
+        width: 100%;
+        padding: 12px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 16px;
+        font-weight: bold;
+        margin-top: 10px;
+      }
+      button:hover {
+        background-color: #0056b3;
+      }
+      button:disabled {
+        background-color: #ccc;
+        cursor: not-allowed;
+      }
+      .tabs {
+        display: flex;
+        margin-bottom: 20px;
+        border-bottom: 1px solid #eee;
+      }
+      .tab {
+        flex: 1;
+        padding: 10px;
+        text-align: center;
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+      }
+      .tab.active {
+        border-bottom-color: #007bff;
+        color: #007bff;
+        font-weight: bold;
+      }
+      .tab-content {
+        display: none;
+      }
+      .tab-content.active {
+        display: block;
+      }
+      .error {
+        color: #dc3545;
+        font-size: 14px;
+        margin-top: 5px;
+        display: none;
+      }
+      .success {
+        color: #28a745;
+        font-size: 14px;
+        margin-top: 5px;
+        display: none;
+      }
+      .api-url-group {
+        margin-bottom: 15px;
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <div class="login-container">
-        <h1>Baileys REST API</h1>
-        
-        <div class="api-url-group">
-            <label for="api-url">API Server URL:</label>
-            <input type="text" id="api-url" value="http://localhost:3001">
-        </div>
+      <h1>Baileys REST API</h1>
 
-        <div class="tabs">
-            <div class="tab active" data-tab="login">Login</div>
-            <div class="tab" data-tab="register">Register</div>
-        </div>
+      <div class="api-url-group">
+        <label for="api-url">API Server URL:</label>
+        <input type="text" id="api-url" value="http://localhost:3001" />
+      </div>
 
-        <div class="tab-content active" id="login-tab">
-            <div class="form-group">
-                <label for="login-tenant-id">Tenant ID:</label>
-                <input type="text" id="login-tenant-id" placeholder="Enter your tenant ID">
-                <div class="error" id="login-tenant-error"></div>
-            </div>
-            <div class="form-group">
-                <label for="login-webhook-url">Webhook URL (optional):</label>
-                <input type="url" id="login-webhook-url" placeholder="https://your-webhook.com">
-            </div>
-            <button id="login-btn">Login</button>
-            <div class="error" id="login-error"></div>
-            <div class="success" id="login-success"></div>
-        </div>
+      <div class="tabs">
+        <div class="tab active" data-tab="login">Login</div>
+        <div class="tab" data-tab="register">Register</div>
+      </div>
 
-        <div class="tab-content" id="register-tab">
-            <div class="form-group">
-                <label for="register-tenant-id">Tenant ID:</label>
-                <input type="text" id="register-tenant-id" placeholder="Choose a tenant ID">
-                <div class="error" id="register-tenant-error"></div>
-            </div>
-            <div class="form-group">
-                <label for="register-webhook-url">Webhook URL:</label>
-                <input type="url" id="register-webhook-url" placeholder="https://your-webhook.com" required>
-                <div class="error" id="register-webhook-error"></div>
-            </div>
-            <button id="register-btn">Register</button>
-            <div class="error" id="register-error"></div>
-            <div class="success" id="register-success"></div>
+      <div class="tab-content active" id="login-tab">
+        <div class="form-group">
+          <label for="login-tenant-id">Tenant ID:</label>
+          <input
+            type="text"
+            id="login-tenant-id"
+            placeholder="Enter your tenant ID"
+          />
+          <div class="error" id="login-tenant-error"></div>
         </div>
+        <div class="form-group">
+          <label for="login-webhook-url">Webhook URL (optional):</label>
+          <input
+            type="url"
+            id="login-webhook-url"
+            placeholder="https://your-webhook.com"
+          />
+        </div>
+        <button id="login-btn">Login</button>
+        <div class="error" id="login-error"></div>
+        <div class="success" id="login-success"></div>
+      </div>
+
+      <div class="tab-content" id="register-tab">
+        <div class="form-group">
+          <label for="register-tenant-id">Tenant ID:</label>
+          <input
+            type="text"
+            id="register-tenant-id"
+            placeholder="Choose a tenant ID"
+          />
+          <div class="error" id="register-tenant-error"></div>
+        </div>
+        <div class="form-group">
+          <label for="register-webhook-url">Webhook URL:</label>
+          <input
+            type="url"
+            id="register-webhook-url"
+            placeholder="https://your-webhook.com"
+            required
+          />
+          <div class="error" id="register-webhook-error"></div>
+        </div>
+        <button id="register-btn">Register</button>
+        <div class="error" id="register-error"></div>
+        <div class="success" id="register-success"></div>
+      </div>
     </div>
 
     <script>
-        // Tab switching
-        document.querySelectorAll('.tab').forEach(tab => {
-            tab.addEventListener('click', () => {
-                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-                
-                tab.classList.add('active');
-                document.getElementById(`${tab.dataset.tab}-tab`).classList.add('active');
-            });
+      // Tab switching
+      document.querySelectorAll(".tab").forEach((tab) => {
+        tab.addEventListener("click", () => {
+          document
+            .querySelectorAll(".tab")
+            .forEach((t) => t.classList.remove("active"));
+          document
+            .querySelectorAll(".tab-content")
+            .forEach((c) => c.classList.remove("active"));
+
+          tab.classList.add("active");
+          document
+            .getElementById(`${tab.dataset.tab}-tab`)
+            .classList.add("active");
         });
+      });
 
-        // API URL management
-        const apiUrlInput = document.getElementById('api-url');
-        
-        // Login functionality
-        const loginBtn = document.getElementById('login-btn');
-        const loginTenantInput = document.getElementById('login-tenant-id');
-        const loginWebhookInput = document.getElementById('login-webhook-url');
-        const loginError = document.getElementById('login-error');
-        const loginSuccess = document.getElementById('login-success');
-        const loginTenantError = document.getElementById('login-tenant-error');
+      // API URL management
+      const apiUrlInput = document.getElementById("api-url");
 
-        // Register functionality
-        const registerBtn = document.getElementById('register-btn');
-        const registerTenantInput = document.getElementById('register-tenant-id');
-        const registerWebhookInput = document.getElementById('register-webhook-url');
-        const registerError = document.getElementById('register-error');
-        const registerSuccess = document.getElementById('register-success');
-        const registerTenantError = document.getElementById('register-tenant-error');
-        const registerWebhookError = document.getElementById('register-webhook-error');
+      // Login functionality
+      const loginBtn = document.getElementById("login-btn");
+      const loginTenantInput = document.getElementById("login-tenant-id");
+      const loginWebhookInput = document.getElementById("login-webhook-url");
+      const loginError = document.getElementById("login-error");
+      const loginSuccess = document.getElementById("login-success");
+      const loginTenantError = document.getElementById("login-tenant-error");
 
-        function showError(element, message) {
-            element.textContent = message;
-            element.style.display = 'block';
-            setTimeout(() => {
-                element.style.display = 'none';
-            }, 5000);
+      // Register functionality
+      const registerBtn = document.getElementById("register-btn");
+      const registerTenantInput = document.getElementById("register-tenant-id");
+      const registerWebhookInput = document.getElementById(
+        "register-webhook-url",
+      );
+      const registerError = document.getElementById("register-error");
+      const registerSuccess = document.getElementById("register-success");
+      const registerTenantError = document.getElementById(
+        "register-tenant-error",
+      );
+      const registerWebhookError = document.getElementById(
+        "register-webhook-error",
+      );
+
+      function showError(element, message) {
+        element.textContent = message;
+        element.style.display = "block";
+        setTimeout(() => {
+          element.style.display = "none";
+        }, 5000);
+      }
+
+      function showSuccess(element, message) {
+        element.textContent = message;
+        element.style.display = "block";
+        setTimeout(() => {
+          element.style.display = "none";
+        }, 3000);
+      }
+
+      // Login handler
+      loginBtn.addEventListener("click", async () => {
+        const tenantId = loginTenantInput.value.trim();
+        const webhookUrl = loginWebhookInput.value.trim();
+
+        if (!tenantId) {
+          showError(loginTenantError, "Tenant ID is required");
+          return;
         }
 
-        function showSuccess(element, message) {
-            element.textContent = message;
-            element.style.display = 'block';
+        loginBtn.disabled = true;
+        loginBtn.textContent = "Logging in...";
+
+        try {
+          const response = await fetch(`${apiUrlInput.value}/api/auth/token`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              tenantId: tenantId,
+              webhook_url: webhookUrl || null,
+            }),
+          });
+
+          const data = await response.json();
+
+          if (response.ok) {
+            // Store token and redirect to session manager
+            localStorage.setItem("jwtToken", data.token);
+            localStorage.setItem("tenantId", tenantId);
+            localStorage.setItem("apiUrl", apiUrlInput.value);
+
+            showSuccess(loginSuccess, "Login successful! Redirecting...");
             setTimeout(() => {
-                element.style.display = 'none';
-            }, 3000);
+              window.location.href = "session-manager.html";
+            }, 1000);
+          } else {
+            showError(loginError, data.message || "Login failed");
+          }
+        } catch (error) {
+          showError(loginError, "Network error: " + error.message);
         }
 
-        // Login handler
-        loginBtn.addEventListener('click', async () => {
-            const tenantId = loginTenantInput.value.trim();
-            const webhookUrl = loginWebhookInput.value.trim();
+        loginBtn.disabled = false;
+        loginBtn.textContent = "Login";
+      });
 
-            if (!tenantId) {
-                showError(loginTenantError, 'Tenant ID is required');
-                return;
-            }
+      // Register handler
+      registerBtn.addEventListener("click", async () => {
+        const tenantId = registerTenantInput.value.trim();
+        const webhookUrl = registerWebhookInput.value.trim();
 
-            loginBtn.disabled = true;
-            loginBtn.textContent = 'Logging in...';
+        if (!tenantId) {
+          showError(registerTenantError, "Tenant ID is required");
+          return;
+        }
 
-            try {
-                const response = await fetch(`${apiUrlInput.value}/api/auth/token`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        tenantId: tenantId,
-                        webhook_url: webhookUrl || null
-                    })
-                });
+        if (!webhookUrl) {
+          showError(
+            registerWebhookError,
+            "Webhook URL is required for registration",
+          );
+          return;
+        }
 
-                const data = await response.json();
+        registerBtn.disabled = true;
+        registerBtn.textContent = "Registering...";
 
-                if (response.ok) {
-                    // Store token and redirect to session manager
-                    localStorage.setItem('jwtToken', data.token);
-                    localStorage.setItem('tenantId', tenantId);
-                    localStorage.setItem('apiUrl', apiUrlInput.value);
-                    
-                    showSuccess(loginSuccess, 'Login successful! Redirecting...');
-                    setTimeout(() => {
-                        window.location.href = 'session-manager.html';
-                    }, 1000);
-                } else {
-                    showError(loginError, data.message || 'Login failed');
-                }
-            } catch (error) {
-                showError(loginError, 'Network error: ' + error.message);
-            }
+        try {
+          const response = await fetch(`${apiUrlInput.value}/api/auth/token`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              tenantId: tenantId,
+              webhook_url: webhookUrl,
+            }),
+          });
 
-            loginBtn.disabled = false;
-            loginBtn.textContent = 'Login';
-        });
+          const data = await response.json();
 
-        // Register handler
-        registerBtn.addEventListener('click', async () => {
-            const tenantId = registerTenantInput.value.trim();
-            const webhookUrl = registerWebhookInput.value.trim();
+          if (response.ok) {
+            // Store token and redirect to session manager
+            localStorage.setItem("jwtToken", data.token);
+            localStorage.setItem("tenantId", tenantId);
+            localStorage.setItem("apiUrl", apiUrlInput.value);
 
-            if (!tenantId) {
-                showError(registerTenantError, 'Tenant ID is required');
-                return;
-            }
+            showSuccess(
+              registerSuccess,
+              "Registration successful! Redirecting...",
+            );
+            setTimeout(() => {
+              window.location.href = "session-manager.html";
+            }, 1000);
+          } else {
+            showError(registerError, data.message || "Registration failed");
+          }
+        } catch (error) {
+          showError(registerError, "Network error: " + error.message);
+        }
 
-            if (!webhookUrl) {
-                showError(registerWebhookError, 'Webhook URL is required for registration');
-                return;
-            }
+        registerBtn.disabled = false;
+        registerBtn.textContent = "Register";
+      });
 
-            registerBtn.disabled = true;
-            registerBtn.textContent = 'Registering...';
-
-            try {
-                const response = await fetch(`${apiUrlInput.value}/api/auth/token`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        tenantId: tenantId,
-                        webhook_url: webhookUrl
-                    })
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    // Store token and redirect to session manager
-                    localStorage.setItem('jwtToken', data.token);
-                    localStorage.setItem('tenantId', tenantId);
-                    localStorage.setItem('apiUrl', apiUrlInput.value);
-                    
-                    showSuccess(registerSuccess, 'Registration successful! Redirecting...');
-                    setTimeout(() => {
-                        window.location.href = 'session-manager.html';
-                    }, 1000);
-                } else {
-                    showError(registerError, data.message || 'Registration failed');
-                }
-            } catch (error) {
-                showError(registerError, 'Network error: ' + error.message);
-            }
-
-            registerBtn.disabled = false;
-            registerBtn.textContent = 'Register';
-        });
-
-        // Check if already logged in
-        document.addEventListener('DOMContentLoaded', () => {
-            const token = localStorage.getItem('jwtToken');
-            if (token) {
-                // Redirect to session manager if already logged in
-                window.location.href = 'session-manager.html';
-            }
-        });
+      // Check if already logged in
+      document.addEventListener("DOMContentLoaded", () => {
+        const token = localStorage.getItem("jwtToken");
+        if (token) {
+          // Redirect to session manager if already logged in
+          window.location.href = "session-manager.html";
+        }
+      });
     </script>
-</body>
+  </body>
 </html>

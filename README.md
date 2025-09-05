@@ -1,4 +1,3 @@
-
 # Baileys REST API (Multi-Tenant + JWT)
 
 A RESTful API wrapper for WhatsApp using the Baileys library, now upgraded to support multiple users/tenants with isolated WhatsApp sessions and per-tenant configuration (webhook URL, business info, etc.). API access uses JWT-based authentication.
@@ -23,6 +22,7 @@ A RESTful API wrapper for WhatsApp using the Baileys library, now upgraded to su
 ## Installation
 
 1. Clone the repository:
+
    ```bash
    git clone https://github.com/yourusername/baileys-rest-api.git
    cd baileys-rest-api
@@ -57,17 +57,20 @@ INGEST_RETRY_MAX_HORIZON_MS=600000
 ```
 
 Notes:
+
 - JWT_SECRET is required for issuing and verifying API tokens.
 - Ingestion settings can be adjusted depending on throughput.
 
 ## Build and Run
 
 Development:
+
 ```bash
 npm run dev
 ```
 
 Production:
+
 ```bash
 npm start
 ```
@@ -119,11 +122,13 @@ Per-tenant webhook delivery is implemented. For each tenant, set `webhook_url`:
 - PUT `/api/business/webhook` (requires Authorization header)
 
 Body:
+
 ```
 { "webhook_url": "https://example.com/hooks/wa" }
 ```
 
 Events delivered (headers include `X-Tenant-Id` and `X-Event-Type`):
+
 - `connection`:
   - `{ "event":"connection", "tenantId":"...", "data": { "status": "connected|waiting_qr|logged_out" } }`
 - `message.received`:
@@ -134,12 +139,14 @@ Events delivered (headers include `X-Tenant-Id` and `X-Event-Type`):
 ## API Endpoints
 
 Authentication
+
 - POST `/api/auth/token`
   - Body: `{ "tenantId": "string", "webhook_url": "string|null (optional)" }`
   - Description: Issues JWT for a tenant; upserts tenant config.
   - Public (no Authorization). Replace with your own auth in production.
 
 Sessions (Authorization required)
+
 - POST `/api/session/start`
   - Description: Starts/Resumes WhatsApp session for the tenant associated with the JWT.
   - Response:
@@ -181,6 +188,7 @@ Sessions (Authorization required)
     ```
 
 Messages (Authorization required)
+
 - POST `/api/message/check-number`
   - Body: `{ "to": "1234567890" }`
   - Description: Check if a number exists on WhatsApp for this tenant's session.
@@ -199,6 +207,7 @@ Messages (Authorization required)
   - Description: Returns stored messages for a chat from SQLite store.
 
 Business (Authorization required)
+
 - GET `/api/business`
   - Description: Returns stored business info for the tenant.
 
@@ -246,6 +255,7 @@ The project includes a web-based frontend for managing WhatsApp sessions and use
 ### Accessing the Frontend
 
 1. **Start the backend server**:
+
    ```bash
    npm run dev
    ```
@@ -296,3 +306,4 @@ frontend/
 1. Issue a token for a tenant and set a webhook (optional):
    ```bash
    curl -X POST http://localhost:3000/api/auth/token \
+   ```

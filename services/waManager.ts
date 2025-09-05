@@ -3,16 +3,16 @@ import {
   DisconnectReason,
   useMultiFileAuthState,
   Browsers,
-} from '@whiskeysockets/baileys';
-import { Boom } from '@hapi/boom';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { pino } from 'pino';
-import fs from 'fs/promises';
-import { logger, errorLogger } from '../utils/logger.js';
-import Store from './sqliteStore.js';
-import ingestion from './ingestion.js';
-import ConfigStore from './configStore.js';
+} from "@whiskeysockets/baileys";
+import { Boom } from "@hapi/boom";
+import path from "path";
+import { fileURLToPath } from "url";
+import { pino } from "pino";
+import fs from "fs/promises";
+import { logger, errorLogger } from "../utils/logger.js";
+import Store from "./sqliteStore.js";
+import ingestion from "./ingestion.js";
+import ConfigStore from "./configStore.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -57,24 +57,31 @@ class TenantSession {
 
   constructor(tenantId: TenantId) {
     this.tenantId = tenantId;
-    this.sessionPath = path.join(__dirname, '..', 'sessions', tenantId);
+    this.sessionPath = path.join(__dirname, "..", "sessions", tenantId);
   }
 
   async isSessionValid(): Promise<boolean> {
     try {
       await fs.access(this.sessionPath);
-      const credsPath = path.join(this.sessionPath, 'creds.json');
+      const credsPath = path.join(this.sessionPath, "creds.json");
       await fs.access(credsPath);
-      const credsData = await fs.readFile(credsPath, 'utf-8');
+      const credsData = await fs.readFile(credsPath, "utf-8");
       const creds = JSON.parse(credsData);
       if (creds && creds.me && creds.platform) {
-        logger.debug({ msg: 'Session appears valid', tenantId: this.tenantId });
+        logger.debug({ msg: "Session appears valid", tenantId: this.tenantId });
         return true;
       }
-      logger.warn({ msg: 'Session creds.json exists but appears invalid', tenantId: this.tenantId });
+      logger.warn({
+        msg: "Session creds.json exists but appears invalid",
+        tenantId: this.tenantId,
+      });
       return false;
     } catch (error) {
-      logger.debug({ msg: 'Session validation failed', tenantId: this.tenantId, error });
+      logger.debug({
+        msg: "Session validation failed",
+        tenantId: this.tenantId,
+        error,
+      });
       return false;
     }
   }
@@ -90,7 +97,7 @@ class TenantSession {
       const cleanup = () => {
         if (timeoutId) clearTimeout(timeoutId);
         if (this.connectionUpdateHandler && this.sock?.ev) {
-          this.sock.ev.off('connection.update', this.connectionUpdateHandler);
+          this.sock.ev.off("connection.update", this.connectionUpdateHandler);
           this.connectionUpdateHandler = null;
         }
       };
@@ -108,13 +115,13 @@ class TenantSession {
             cleanup();
             this.qr = qr;
             resolve(qr);
-          } else if (connection === 'open') {
+          } else if (connection === "open") {
             cleanup();
             resolve(null);
           }
         };
 
-        this.sock.ev.on('connection.update', this.connectionUpdateHandler);
+        this.sock.ev.on("connection.update", this.connectionUpdateHandler);
       } else {
         cleanup();
         resolve(null);
@@ -122,17 +129,22 @@ class TenantSession {
     });
   }
 
-  async initialize(isReconnecting: boolean = false): Promise<WhatsAppServiceResult> {
+  async initialize(
+    isReconnecting: boolean = false,
+  ): Promise<WhatsAppServiceResult> {
     try {
       try {
         await fs.access(this.sessionPath);
       } catch (error) {
         if (isReconnecting) {
-          logger.warn({ msg: 'No session found, cannot reconnect', tenantId: this.tenantId });
+          logger.warn({
+            msg: "No session found, cannot reconnect",
+            tenantId: this.tenantId,
+          });
           return {
             success: false,
-            status: 'error',
-            message: 'No session found, cannot reconnect',
+            status: "error",
+            message: "No session found, cannot reconnect",
           };
         }
       }
@@ -144,11 +156,11 @@ class TenantSession {
             msg: `Maximum reconnection attempts (${this.MAX_RECONNECT_ATTEMPTS}) exceeded`,
             tenantId: this.tenantId,
           });
-          await this.handleLogout('max_attempts_exceeded');
+          await this.handleLogout("max_attempts_exceeded");
           return await this.initialize(false);
         }
         logger.info({
-          msg: 'Attempting to reconnect...',
+          msg: "Attempting to reconnect...",
           attempt: `${this.reconnectAttempts}/${this.MAX_RECONNECT_ATTEMPTS}`,
           tenantId: this.tenantId,
         } as any);
@@ -156,23 +168,29 @@ class TenantSession {
         this.resetReconnectAttempts();
       }
 
-      const { state, saveCreds } = await useMultiFileAuthState(this.sessionPath);
+      const { state, saveCreds } = await useMultiFileAuthState(
+        this.sessionPath,
+      );
 
       this.sock = makeWASocket({
         auth: state,
-        browser: Browsers.macOS('Desktop'),
+        browser: Browsers.macOS("Desktop"),
         syncFullHistory: true,
-        logger: pino({ level: 'silent' }),
+        logger: pino({ level: "silent" }),
       });
 
-      this.sock.ev.on('connection.update', async (update: any) => {
-        logger.debug({ msg: 'Connection update received', update, tenantId: this.tenantId });
+      this.sock.ev.on("connection.update", async (update: any) => {
+        logger.debug({
+          msg: "Connection update received",
+          update,
+          tenantId: this.tenantId,
+        });
         const { connection, lastDisconnect } = update;
 
-        if (connection === 'close') {
+        if (connection === "close") {
           if (this.isConnected && isReconnecting) {
             logger.info({
-              msg: 'Connection already active, reconnection cancelled',
+              msg: "Connection already active, reconnection cancelled",
               tenantId: this.tenantId,
             });
             return;
@@ -188,30 +206,30 @@ class TenantSession {
             await this.initialize(true);
           } else if (!shouldReconnect) {
             logger.info({
-              msg: 'Session terminated',
+              msg: "Session terminated",
               tenantId: this.tenantId,
             });
-            await this.handleLogout('connection_closed');
+            await this.handleLogout("connection_closed");
             await this.initialize(false);
           }
-        } else if (connection === 'open') {
+        } else if (connection === "open") {
           this.isConnected = true;
           this.qr = null;
           this.resetReconnectAttempts();
           logger.info({
-            msg: 'WhatsApp connection successful!',
+            msg: "WhatsApp connection successful!",
             tenantId: this.tenantId,
           });
 
-          await TenantManager.notifyWebhook(this.tenantId, 'connection', {
-            status: 'connected',
+          await TenantManager.notifyWebhook(this.tenantId, "connection", {
+            status: "connected",
           });
 
           try {
             await this.refreshBusinessInfo();
           } catch (e) {
             errorLogger.error({
-              msg: 'Failed to refresh business info after connect',
+              msg: "Failed to refresh business info after connect",
               tenantId: this.tenantId,
               error: (e as Error)?.message || e,
             });
@@ -219,22 +237,22 @@ class TenantSession {
         }
       });
 
-      this.sock.ev.on('creds.update', saveCreds);
+      this.sock.ev.on("creds.update", saveCreds);
 
-      this.sock.ev.on('chats.set', ({ chats }: any) => {
+      this.sock.ev.on("chats.set", ({ chats }: any) => {
         try {
           const list = chats || [];
           Store.upsertChats(list);
         } catch (e) {
           errorLogger.error({
-            msg: 'Error syncing chats.set',
+            msg: "Error syncing chats.set",
             error: (e as Error)?.message || e,
             tenantId: this.tenantId,
           });
         }
       });
 
-      this.sock.ev.on('chats.upsert', (payload: any) => {
+      this.sock.ev.on("chats.upsert", (payload: any) => {
         try {
           const list = Array.isArray(payload) ? payload : payload?.chats || [];
           if (list.length) {
@@ -242,7 +260,7 @@ class TenantSession {
           }
         } catch (e) {
           errorLogger.error({
-            msg: 'Error processing chats.upsert',
+            msg: "Error processing chats.upsert",
             error: (e as Error)?.message || e,
             tenantId: this.tenantId,
           });
@@ -270,18 +288,19 @@ class TenantSession {
 
           if (messages.length) {
             for (const msg of messages) {
-              const messageType = Object.keys(msg.message || {})[0] || '';
-              if (messageType === 'protocolMessage') continue;
+              const messageType = Object.keys(msg.message || {})[0] || "";
+              if (messageType === "protocolMessage") continue;
 
               const info: MessageInfo = {
                 id: msg.key?.id,
                 from: msg.key?.remoteJid,
                 fromMe: !!msg.key?.fromMe,
-                timestamp: Number(msg.messageTimestamp) || Math.floor(Date.now() / 1000),
+                timestamp:
+                  Number(msg.messageTimestamp) || Math.floor(Date.now() / 1000),
                 type: messageType,
                 pushName: msg.pushName || null,
                 content: TenantManager.extractMessageContent(msg),
-                isGroup: (msg.key?.remoteJid || '').endsWith('@g.us'),
+                isGroup: (msg.key?.remoteJid || "").endsWith("@g.us"),
               };
 
               if (info.id && info.from) {
@@ -289,7 +308,7 @@ class TenantSession {
                   const res = await ingestion.enqueueMessage(info);
                   if (!res.accepted) {
                     errorLogger.error({
-                      msg: 'Failed to enqueue history message',
+                      msg: "Failed to enqueue history message",
                       error: res.reason,
                       idempotencyKey: res.idempotencyKey,
                       correlationId: res.correlationId,
@@ -298,7 +317,7 @@ class TenantSession {
                   }
                 } catch (e) {
                   errorLogger.error({
-                    msg: 'Failed to enqueue history message',
+                    msg: "Failed to enqueue history message",
                     error: (e as Error)?.message || e,
                     tenantId: this.tenantId,
                   });
@@ -308,19 +327,21 @@ class TenantSession {
           }
         } catch (e) {
           errorLogger.error({
-            msg: 'Error processing messaging-history',
+            msg: "Error processing messaging-history",
             error: (e as Error)?.message || e,
             tenantId: this.tenantId,
           });
         }
       };
 
-      this.sock.ev.on('messaging-history.set', processHistory as any);
-      this.sock.ev.on('messaging.history-set', processHistory as any);
+      this.sock.ev.on("messaging-history.set", processHistory as any);
+      this.sock.ev.on("messaging.history-set", processHistory as any);
 
-      this.sock.ev.on('contacts.set', (contacts: any) => {
+      this.sock.ev.on("contacts.set", (contacts: any) => {
         try {
-          const list = Array.isArray(contacts) ? contacts : contacts?.contacts || [];
+          const list = Array.isArray(contacts)
+            ? contacts
+            : contacts?.contacts || [];
           for (const c of list || []) {
             const jid = c.id || c.jid;
             if (!jid) continue;
@@ -329,14 +350,14 @@ class TenantSession {
           }
         } catch (e) {
           errorLogger.error({
-            msg: 'Error processing contacts.set',
+            msg: "Error processing contacts.set",
             error: (e as Error)?.message || e,
             tenantId: this.tenantId,
           });
         }
       });
 
-      this.sock.ev.on('contacts.upsert', (contacts: any) => {
+      this.sock.ev.on("contacts.upsert", (contacts: any) => {
         try {
           (contacts || []).forEach((c: any) => {
             const jid = c.id || c.jid;
@@ -346,20 +367,20 @@ class TenantSession {
           });
         } catch (e) {
           errorLogger.error({
-            msg: 'Error processing contacts.upsert',
+            msg: "Error processing contacts.upsert",
             error: (e as Error)?.message || e,
             tenantId: this.tenantId,
           });
         }
       });
 
-      this.sock.ev.on('messages.upsert', async (m: any) => {
-        if (m.type === 'notify') {
+      this.sock.ev.on("messages.upsert", async (m: any) => {
+        if (m.type === "notify") {
           try {
             await Promise.all(
               m.messages.map(async (msg: any) => {
-                const messageType = Object.keys(msg.message || {})[0] || '';
-                if (messageType === 'protocolMessage') return;
+                const messageType = Object.keys(msg.message || {})[0] || "";
+                if (messageType === "protocolMessage") return;
 
                 const messageInfo: MessageInfo = {
                   id: msg.key.id,
@@ -369,14 +390,14 @@ class TenantSession {
                   type: messageType,
                   pushName: msg.pushName,
                   content: TenantManager.extractMessageContent(msg),
-                  isGroup: msg.key.remoteJid?.endsWith('@g.us') || false,
+                  isGroup: msg.key.remoteJid?.endsWith("@g.us") || false,
                 };
 
                 try {
                   const res = await ingestion.enqueueMessage(messageInfo);
                   if (!res.accepted) {
                     errorLogger.error({
-                      msg: 'Failed to enqueue incoming message',
+                      msg: "Failed to enqueue incoming message",
                       error: res.reason,
                       idempotencyKey: res.idempotencyKey,
                       correlationId: res.correlationId,
@@ -385,27 +406,31 @@ class TenantSession {
                   }
                 } catch (e) {
                   errorLogger.error({
-                    msg: 'Failed to enqueue incoming message',
+                    msg: "Failed to enqueue incoming message",
                     error: (e as Error)?.message || e,
                     tenantId: this.tenantId,
                   });
                 }
 
                 const businessInfo = ConfigStore.getBusinessInfo(this.tenantId);
-                await TenantManager.notifyWebhook(this.tenantId, 'message.received', {
-                  message: messageInfo,
-                  business: businessInfo,
-                });
-              })
+                await TenantManager.notifyWebhook(
+                  this.tenantId,
+                  "message.received",
+                  {
+                    message: messageInfo,
+                    business: businessInfo,
+                  },
+                );
+              }),
             );
           } catch (error: any) {
             errorLogger.error({
-              msg: 'Error processing incoming message',
+              msg: "Error processing incoming message",
               error: error.message,
               tenantId: this.tenantId,
             });
-            await TenantManager.notifyWebhook(this.tenantId, 'error', {
-              type: 'message_processing_error',
+            await TenantManager.notifyWebhook(this.tenantId, "error", {
+              type: "message_processing_error",
               error: error.message,
             });
           }
@@ -415,13 +440,13 @@ class TenantSession {
       const qr = await this.waitForQR();
 
       if (qr) {
-        await TenantManager.notifyWebhook(this.tenantId, 'connection', {
-          status: 'waiting_qr',
+        await TenantManager.notifyWebhook(this.tenantId, "connection", {
+          status: "waiting_qr",
           qr,
         });
         return {
           success: true,
-          status: 'waiting_qr',
+          status: "waiting_qr",
           qr,
         };
       }
@@ -429,62 +454,70 @@ class TenantSession {
       if (this.isConnected) {
         return {
           success: true,
-          status: 'connected',
-          message: 'WhatsApp connection successful',
+          status: "connected",
+          message: "WhatsApp connection successful",
         };
       }
 
       return {
         success: false,
-        status: 'error',
-        message: 'Failed to get QR code or establish connection',
+        status: "error",
+        message: "Failed to get QR code or establish connection",
       };
     } catch (error: any) {
       errorLogger.error({
-        msg: 'Error during WhatsApp connection initialization',
+        msg: "Error during WhatsApp connection initialization",
         tenantId: this.tenantId,
         error: error?.message || error,
       });
-      await TenantManager.notifyWebhook(this.tenantId, 'error', { error: error.message });
+      await TenantManager.notifyWebhook(this.tenantId, "error", {
+        error: error.message,
+      });
       return {
         success: false,
-        status: 'error',
-        message: 'Failed to initialize WhatsApp connection',
+        status: "error",
+        message: "Failed to initialize WhatsApp connection",
         error: error.message,
       };
     }
   }
 
-  async handleLogout(reason: string = 'normal_logout'): Promise<WhatsAppServiceResult> {
+  async handleLogout(
+    reason: string = "normal_logout",
+  ): Promise<WhatsAppServiceResult> {
     try {
       await fs.rm(this.sessionPath, { recursive: true, force: true });
       this.sock = null;
       this.isConnected = false;
       this.qr = null;
 
-      await TenantManager.notifyWebhook(this.tenantId, 'connection', {
-        status: 'logged_out',
+      await TenantManager.notifyWebhook(this.tenantId, "connection", {
+        status: "logged_out",
         reason,
       });
 
-      logger.info({ msg: 'Session files cleaned and session terminated', reason, tenantId: this.tenantId });
+      logger.info({
+        msg: "Session files cleaned and session terminated",
+        reason,
+        tenantId: this.tenantId,
+      });
 
       return {
         success: true,
-        status: 'logged_out',
-        message: 'Session successfully terminated',
+        status: "logged_out",
+        message: "Session successfully terminated",
         reason,
       };
     } catch (error: any) {
       errorLogger.error({
-        msg: 'Error during session cleanup',
+        msg: "Error during session cleanup",
         tenantId: this.tenantId,
         error: error?.message || error,
       });
       return {
         success: false,
-        status: 'error',
-        message: 'Error occurred while terminating session',
+        status: "error",
+        message: "Error occurred while terminating session",
         error: error.message,
       };
     }
@@ -494,23 +527,23 @@ class TenantSession {
     try {
       if (this.sock) {
         await this.sock.logout();
-        return await this.handleLogout('user_logout');
+        return await this.handleLogout("user_logout");
       }
       return {
         success: false,
-        status: 'error',
-        message: 'No active session found',
+        status: "error",
+        message: "No active session found",
       };
     } catch (error: any) {
       errorLogger.error({
-        msg: 'Error during logout',
+        msg: "Error during logout",
         tenantId: this.tenantId,
         error: error?.message || error,
       });
       return {
         success: false,
-        status: 'error',
-        message: 'Error occurred while logging out',
+        status: "error",
+        message: "Error occurred while logging out",
         error: error.message,
       };
     }
@@ -533,28 +566,41 @@ class TenantSession {
       const existing = ConfigStore.getBusinessInfo(this.tenantId);
 
       if (!this.sock || !this.isConnected) {
-        return { stored: existing, fetched: null, persisted: false, reason: 'not_connected' };
+        return {
+          stored: existing,
+          fetched: null,
+          persisted: false,
+          reason: "not_connected",
+        };
       }
 
       const meJid: string | null =
         (this.sock.user && (this.sock.user.id || this.sock.user.jid)) ||
-        (this.sock.authState && this.sock.authState.creds && this.sock.authState.creds.me && (this.sock.authState.creds.me.id || this.sock.authState.creds.me.jid)) ||
+        (this.sock.authState &&
+          this.sock.authState.creds &&
+          this.sock.authState.creds.me &&
+          (this.sock.authState.creds.me.id ||
+            this.sock.authState.creds.me.jid)) ||
         null;
 
       const meName: string | null =
         (this.sock.user && (this.sock.user.name || this.sock.user.pushName)) ||
-        (this.sock.authState && this.sock.authState.creds && this.sock.authState.creds.me && (this.sock.authState.creds.me.name || this.sock.authState.creds.me.pushName)) ||
+        (this.sock.authState &&
+          this.sock.authState.creds &&
+          this.sock.authState.creds.me &&
+          (this.sock.authState.creds.me.name ||
+            this.sock.authState.creds.me.pushName)) ||
         null;
 
       let fetchedProfile: any | null = null;
 
       try {
-        if (typeof this.sock.getBusinessProfile === 'function' && meJid) {
+        if (typeof this.sock.getBusinessProfile === "function" && meJid) {
           fetchedProfile = await this.sock.getBusinessProfile(meJid);
         }
       } catch (e) {
         errorLogger.error({
-          msg: 'getBusinessProfile failed',
+          msg: "getBusinessProfile failed",
           tenantId: this.tenantId,
           error: (e as Error)?.message || e,
         });
@@ -562,7 +608,7 @@ class TenantSession {
 
       let about: string | null = null;
       try {
-        if (typeof this.sock.fetchStatus === 'function' && meJid) {
+        if (typeof this.sock.fetchStatus === "function" && meJid) {
           const s = await this.sock.fetchStatus(meJid);
           about = s?.status || null;
         }
@@ -571,7 +617,12 @@ class TenantSession {
       }
 
       const mapped = {
-        name: meName || fetchedProfile?.title || fetchedProfile?.businessName || existing.name || null,
+        name:
+          meName ||
+          fetchedProfile?.title ||
+          fetchedProfile?.businessName ||
+          existing.name ||
+          null,
         working_hours: fetchedProfile?.businessHours
           ? JSON.stringify(fetchedProfile.businessHours)
           : existing.working_hours || null,
@@ -580,19 +631,26 @@ class TenantSession {
           : existing.location_url || null,
         shipping_details: existing.shipping_details || null,
         instagram_url: Array.isArray(fetchedProfile?.connectedAccounts)
-          ? (fetchedProfile.connectedAccounts.find((a: any) => a?.type?.toLowerCase?.() === 'instagram')?.value || existing.instagram_url || null)
+          ? fetchedProfile.connectedAccounts.find(
+              (a: any) => a?.type?.toLowerCase?.() === "instagram",
+            )?.value ||
+            existing.instagram_url ||
+            null
           : existing.instagram_url || null,
         website_url: (() => {
-          const websites = fetchedProfile?.websites || fetchedProfile?.website || [];
+          const websites =
+            fetchedProfile?.websites || fetchedProfile?.website || [];
           if (Array.isArray(websites) && websites.length) return websites[0];
-          if (typeof websites === 'string' && websites) return websites;
+          if (typeof websites === "string" && websites) return websites;
           return existing.website_url || null;
         })(),
         mobile_numbers: (() => {
-          const nums = Array.isArray(existing.mobile_numbers) ? [...existing.mobile_numbers] : [];
-          if (meJid && meJid.includes('@')) {
-            const base = (meJid ?? '').split('@')[0];
-            const digits = (base || '').replace(/[^\d]/g, '');
+          const nums = Array.isArray(existing.mobile_numbers)
+            ? [...existing.mobile_numbers]
+            : [];
+          if (meJid && meJid.includes("@")) {
+            const base = (meJid ?? "").split("@")[0];
+            const digits = (base || "").replace(/[^\d]/g, "");
             if (digits && !nums.includes(digits)) nums.push(digits);
           }
           return nums.length ? nums : (existing.mobile_numbers as any) || null;
@@ -618,7 +676,7 @@ class TenantSession {
       };
     } catch (e) {
       errorLogger.error({
-        msg: 'refreshBusinessInfo failed',
+        msg: "refreshBusinessInfo failed",
         tenantId: this.tenantId,
         error: (e as Error)?.message || e,
       });
@@ -626,19 +684,19 @@ class TenantSession {
         stored: ConfigStore.getBusinessInfo(this.tenantId),
         fetched: null,
         persisted: false,
-        reason: 'exception',
+        reason: "exception",
       };
     }
   }
 
   async sendMessage(to: string, message: string): Promise<any> {
     if (!this.isConnected) {
-      throw new Error('WhatsApp connection is not active');
+      throw new Error("WhatsApp connection is not active");
     }
 
-    let jid = String(to || '');
-    if (!jid.includes('@')) {
-      const digits = jid.replace(/[^\d]/g, '');
+    let jid = String(to || "");
+    if (!jid.includes("@")) {
+      const digits = jid.replace(/[^\d]/g, "");
       if (digits) {
         jid = `${digits}@s.whatsapp.net`;
       }
@@ -647,21 +705,22 @@ class TenantSession {
     try {
       const result = await this.sock.sendMessage(jid, { text: message });
       try {
-        const timestamp = result.messageTimestamp || Math.floor(Date.now() / 1000);
+        const timestamp =
+          result.messageTimestamp || Math.floor(Date.now() / 1000);
         const messageInfo: MessageInfo = {
           id: result.key.id,
           from: result.key.remoteJid || jid,
           fromMe: true,
           timestamp,
-          type: 'conversation',
+          type: "conversation",
           pushName: null,
-          content: { type: 'text', text: message },
-          isGroup: (jid || '').endsWith('@g.us'),
+          content: { type: "text", text: message },
+          isGroup: (jid || "").endsWith("@g.us"),
         };
         const res = await ingestion.enqueueMessage(messageInfo);
         if (!res.accepted) {
           errorLogger.error({
-            msg: 'Failed to enqueue outgoing message',
+            msg: "Failed to enqueue outgoing message",
             error: res.reason,
             idempotencyKey: res.idempotencyKey,
             correlationId: res.correlationId,
@@ -670,7 +729,7 @@ class TenantSession {
         }
       } catch (e) {
         errorLogger.error({
-          msg: 'Failed to persist outgoing message',
+          msg: "Failed to persist outgoing message",
           error: (e as Error)?.message || e,
           tenantId: this.tenantId,
         });
@@ -679,7 +738,7 @@ class TenantSession {
       return result;
     } catch (error: any) {
       errorLogger.error({
-        msg: 'Failed to send message',
+        msg: "Failed to send message",
         error: error.message,
         tenantId: this.tenantId,
       });
@@ -689,11 +748,13 @@ class TenantSession {
 
   async checkNumber(phoneNumber: string): Promise<any> {
     if (!this.isConnected) {
-      throw new Error('WhatsApp connection is not active');
+      throw new Error("WhatsApp connection is not active");
     }
 
     try {
-      const [result] = await this.sock.onWhatsApp(phoneNumber.replace(/[^\d]/g, ''));
+      const [result] = await this.sock.onWhatsApp(
+        phoneNumber.replace(/[^\d]/g, ""),
+      );
       if (result) {
         return {
           exists: true,
@@ -706,7 +767,7 @@ class TenantSession {
       };
     } catch (error: any) {
       errorLogger.error({
-        msg: 'Failed to check phone number',
+        msg: "Failed to check phone number",
         phoneNumber,
         error: error.message,
         tenantId: this.tenantId,
@@ -718,7 +779,7 @@ class TenantSession {
 
 class TenantManager {
   private sessions = new Map<TenantId, TenantSession>();
-  private sessionsBasePath = path.join(__dirname, '..', 'sessions');
+  private sessionsBasePath = path.join(__dirname, "..", "sessions");
 
   private getOrCreate(tenantId: TenantId): TenantSession {
     let s = this.sessions.get(tenantId);
@@ -746,7 +807,11 @@ class TenantManager {
     return this.getOrCreate(tenantId).isSessionValid();
   }
 
-  async sendMessage(tenantId: TenantId, to: string, message: string): Promise<any> {
+  async sendMessage(
+    tenantId: TenantId,
+    to: string,
+    message: string,
+  ): Promise<any> {
     return this.getOrCreate(tenantId).sendMessage(to, message);
   }
 
@@ -761,13 +826,17 @@ class TenantManager {
   // Discover available tenant sessions by scanning sessions directory
   async listAvailableTenantIds(): Promise<TenantId[]> {
     try {
-      const entries = await fs.readdir(this.sessionsBasePath, { withFileTypes: true } as any);
-      const dirs = entries.filter((e: any) => e.isDirectory?.() || e.isDirectory).map((e: any) => e.name);
+      const entries = await fs.readdir(this.sessionsBasePath, {
+        withFileTypes: true,
+      } as any);
+      const dirs = entries
+        .filter((e: any) => e.isDirectory?.() || e.isDirectory)
+        .map((e: any) => e.name);
       const candidates: TenantId[] = [];
       for (const dir of dirs) {
         try {
           // consider a valid candidate if creds.json exists
-          const credsPath = path.join(this.sessionsBasePath, dir, 'creds.json');
+          const credsPath = path.join(this.sessionsBasePath, dir, "creds.json");
           await fs.access(credsPath);
           candidates.push(dir);
         } catch {
@@ -785,35 +854,58 @@ class TenantManager {
     try {
       const tenantIds = await this.listAvailableTenantIds();
       if (!tenantIds.length) {
-        logger.info({ msg: 'No existing sessions found for auto-connect' });
+        logger.info({ msg: "No existing sessions found for auto-connect" });
         return;
       }
 
-      logger.info({ msg: 'Auto-connecting sessions on startup', count: tenantIds.length, tenants: tenantIds });
+      logger.info({
+        msg: "Auto-connecting sessions on startup",
+        count: tenantIds.length,
+        tenants: tenantIds,
+      });
 
       for (const tenantId of tenantIds) {
         try {
           const valid = await this.isSessionValid(tenantId);
           if (!valid) {
-            logger.warn({ msg: 'Skipping auto-connect: session invalid', tenantId });
+            logger.warn({
+              msg: "Skipping auto-connect: session invalid",
+              tenantId,
+            });
             continue;
           }
           const res = await this.initialize(tenantId);
-          logger.info({ msg: 'Auto-connect attempt finished', tenantId, status: res.status, success: res.success });
+          logger.info({
+            msg: "Auto-connect attempt finished",
+            tenantId,
+            status: res.status,
+            success: res.success,
+          });
         } catch (e: any) {
-          errorLogger.error({ msg: 'Auto-connect failed for tenant', tenantId, error: (e as Error)?.message || e });
+          errorLogger.error({
+            msg: "Auto-connect failed for tenant",
+            tenantId,
+            error: (e as Error)?.message || e,
+          });
         }
       }
     } catch (e: any) {
-      errorLogger.error({ msg: 'Auto-connect routine encountered an error', error: (e as Error)?.message || e });
+      errorLogger.error({
+        msg: "Auto-connect routine encountered an error",
+        error: (e as Error)?.message || e,
+      });
     }
   }
 
-  static async notifyWebhook(tenantId: TenantId, event: string, data: any): Promise<void> {
+  static async notifyWebhook(
+    tenantId: TenantId,
+    event: string,
+    data: any,
+  ): Promise<void> {
     const webhookUrl = ConfigStore.getWebhookUrl(tenantId);
     if (!webhookUrl) {
       logger.warn({
-        msg: 'Webhook URL not configured, skipping notification',
+        msg: "Webhook URL not configured, skipping notification",
         tenantId,
       });
       return;
@@ -821,12 +913,12 @@ class TenantManager {
 
     try {
       const response = await fetch(webhookUrl, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          'User-Agent': 'Baileys-API-Webhook',
-          'X-Event-Type': event,
-          'X-Tenant-Id': tenantId,
+          "Content-Type": "application/json",
+          "User-Agent": "Baileys-API-Webhook",
+          "X-Event-Type": event,
+          "X-Tenant-Id": tenantId,
         },
         body: JSON.stringify({
           event,
@@ -838,12 +930,12 @@ class TenantManager {
 
       if (!response.ok) {
         throw new Error(
-          `Webhook request failed with status ${response.status}: ${response.statusText}`
+          `Webhook request failed with status ${response.status}: ${response.statusText}`,
         );
       }
     } catch (error: any) {
       errorLogger.error({
-        msg: 'Error during webhook notification',
+        msg: "Error during webhook notification",
         event,
         tenantId,
         error: error.message,
@@ -858,62 +950,62 @@ class TenantManager {
     const messageContent = messageType ? msg.message[messageType] : null;
 
     switch (messageType) {
-      case 'conversation':
-        return { type: 'text', text: messageContent };
-      case 'extendedTextMessage':
+      case "conversation":
+        return { type: "text", text: messageContent };
+      case "extendedTextMessage":
         return {
-          type: 'text',
+          type: "text",
           text: messageContent.text,
           contextInfo: messageContent.contextInfo,
         };
-      case 'imageMessage':
+      case "imageMessage":
         return {
-          type: 'image',
+          type: "image",
           caption: messageContent.caption,
           mimetype: messageContent.mimetype,
         };
-      case 'videoMessage':
+      case "videoMessage":
         return {
-          type: 'video',
+          type: "video",
           caption: messageContent.caption,
           mimetype: messageContent.mimetype,
         };
-      case 'audioMessage':
+      case "audioMessage":
         return {
-          type: 'audio',
+          type: "audio",
           mimetype: messageContent.mimetype,
           seconds: messageContent.seconds,
         };
-      case 'documentMessage':
+      case "documentMessage":
         return {
-          type: 'document',
+          type: "document",
           fileName: messageContent.fileName,
           mimetype: messageContent.mimetype,
         };
-      case 'stickerMessage':
+      case "stickerMessage":
         return {
-          type: 'sticker',
+          type: "sticker",
           mimetype: messageContent.mimetype,
         };
-      case 'locationMessage':
+      case "locationMessage":
         return {
-          type: 'location',
+          type: "location",
           degreesLatitude: messageContent.degreesLatitude,
           degreesLongitude: messageContent.degreesLongitude,
           name: messageContent.name,
         };
-      case 'contactMessage':
+      case "contactMessage":
         return {
-          type: 'contact',
+          type: "contact",
           displayName: messageContent.displayName,
           vcard: messageContent.vcard,
         };
-      case 'protocolMessage':
+      case "protocolMessage":
         return null;
       default:
         return {
           type: messageType,
-          content: 'Message type not specifically handled',
+          content: "Message type not specifically handled",
         };
     }
   }

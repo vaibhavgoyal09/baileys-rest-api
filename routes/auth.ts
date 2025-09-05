@@ -1,8 +1,8 @@
-import express, { Request, Response } from 'express';
-import { signJwt } from '../utils/jwt.js';
-import ConfigStore from '../services/configStore.js';
-import validator from '../middlewares/validator.js';
-import { issueToken } from '../validators/user.js';
+import express, { Request, Response } from "express";
+import { signJwt } from "../utils/jwt.js";
+import ConfigStore from "../services/configStore.js";
+import validator from "../middlewares/validator.js";
+import { issueToken } from "../validators/user.js";
 
 const router = express.Router();
 
@@ -15,28 +15,34 @@ const router = express.Router();
  *
  * This is a simple bootstrap endpoint. In production, replace with a real user-auth system.
  */
-router.post('/token', validator(issueToken), async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { tenantId, webhook_url } = req.body || {};
+router.post(
+  "/token",
+  validator(issueToken),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { tenantId, webhook_url } = req.body || {};
 
-    if (webhook_url !== undefined) {
-      ConfigStore.upsertUserConfig(tenantId, { webhook_url: webhook_url ?? null });
-    } else {
-      // ensure tenant exists
-      ConfigStore.upsertUserConfig(tenantId, { webhook_url: null });
+      if (webhook_url !== undefined) {
+        ConfigStore.upsertUserConfig(tenantId, {
+          webhook_url: webhook_url ?? null,
+        });
+      } else {
+        // ensure tenant exists
+        ConfigStore.upsertUserConfig(tenantId, { webhook_url: null });
+      }
+
+      const token = signJwt({ userId: tenantId });
+      (res as any).sendResponse(200, {
+        success: true,
+        token,
+        token_type: "Bearer",
+        tenantId,
+        webhook_url: ConfigStore.getWebhookUrl(tenantId),
+      });
+    } catch (error) {
+      (res as any).sendError(500, error);
     }
-
-    const token = signJwt({ userId: tenantId });
-    (res as any).sendResponse(200, {
-      success: true,
-      token,
-      token_type: 'Bearer',
-      tenantId,
-      webhook_url: ConfigStore.getWebhookUrl(tenantId),
-    });
-  } catch (error) {
-    (res as any).sendError(500, error);
-  }
-});
+  },
+);
 
 export default router;

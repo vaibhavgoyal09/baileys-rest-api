@@ -1,4 +1,4 @@
-import Joi from 'joi';
+import Joi from "joi";
 
 const sendText = Joi.object({
   to: Joi.string().required(),
@@ -10,13 +10,8 @@ const checkNumber = Joi.object({
 });
 
 const listConversations = Joi.object({
-  limit: Joi.number().integer().min(1).max(500)
-    .optional(),
+  limit: Joi.number().integer().min(1).max(500).optional(),
   cursor: Joi.number().integer().optional(),
 });
 
-export {
-  sendText,
-  checkNumber,
-  listConversations,
-};
+export { sendText, checkNumber, listConversations };

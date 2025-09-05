@@ -1,8 +1,8 @@
-import path from 'path';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
-import Database from 'better-sqlite3';
-import { logger, errorLogger } from '../utils/logger.js';
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
+import Database from "better-sqlite3";
+import { logger, errorLogger } from "../utils/logger.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -27,12 +27,17 @@ class ConfigStore {
   private dbFilePath: string;
   private db: Database.Database;
 
-  constructor(dbFilePath: string = path.join(__dirname, '..', 'data', 'config.db')) {
+  constructor(
+    dbFilePath: string = path.join(__dirname, "..", "data", "config.db"),
+  ) {
     this.dbFilePath = dbFilePath;
     ConfigStore.ensureDir(path.dirname(this.dbFilePath));
     this.db = new Database(this.dbFilePath);
     this.initSchema();
-    logger.info({ msg: 'Config store initialized', dbFilePath: this.dbFilePath });
+    logger.info({
+      msg: "Config store initialized",
+      dbFilePath: this.dbFilePath,
+    });
   }
 
   static ensureDir(dir: string): void {
@@ -40,7 +45,7 @@ class ConfigStore {
   }
 
   private initSchema(): void {
-    this.db.pragma('journal_mode = WAL');
+    this.db.pragma("journal_mode = WAL");
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS users (
         tenant_id TEXT PRIMARY KEY,
@@ -69,17 +74,19 @@ class ConfigStore {
   ensureTenant(tenantId: TenantId): void {
     try {
       this.db
-        .prepare(
-          `INSERT OR IGNORE INTO users (tenant_id) VALUES (@tenant_id)`
-        )
+        .prepare(`INSERT OR IGNORE INTO users (tenant_id) VALUES (@tenant_id)`)
         .run({ tenant_id: tenantId });
       this.db
         .prepare(
-          `INSERT OR IGNORE INTO business_info (tenant_id) VALUES (@tenant_id)`
+          `INSERT OR IGNORE INTO business_info (tenant_id) VALUES (@tenant_id)`,
         )
         .run({ tenant_id: tenantId });
     } catch (e) {
-      errorLogger.error({ msg: 'ensureTenant failed', tenantId, error: (e as Error)?.message || e });
+      errorLogger.error({
+        msg: "ensureTenant failed",
+        tenantId,
+        error: (e as Error)?.message || e,
+      });
     }
   }
 
@@ -90,7 +97,11 @@ class ConfigStore {
         .get({ tenant_id: tenantId }) as any;
       return row?.webhook_url || null;
     } catch (e) {
-      errorLogger.error({ msg: 'getWebhookUrl failed', tenantId, error: (e as Error)?.message || e });
+      errorLogger.error({
+        msg: "getWebhookUrl failed",
+        tenantId,
+        error: (e as Error)?.message || e,
+      });
       return null;
     }
   }
@@ -106,23 +117,29 @@ class ConfigStore {
           ON CONFLICT(tenant_id) DO UPDATE SET
             webhook_url = COALESCE(excluded.webhook_url, users.webhook_url),
             updated_at = excluded.updated_at
-        `
+        `,
         )
         .run({
           tenant_id: tenantId,
           webhook_url: cfg.webhook_url ?? null,
         });
     } catch (e) {
-      errorLogger.error({ msg: 'upsertUserConfig failed', tenantId, error: (e as Error)?.message || e });
+      errorLogger.error({
+        msg: "upsertUserConfig failed",
+        tenantId,
+        error: (e as Error)?.message || e,
+      });
     }
   }
 
-  getBusinessInfo(tenantId: TenantId): Required<BusinessInfo> & { last_updated: number | null } {
+  getBusinessInfo(
+    tenantId: TenantId,
+  ): Required<BusinessInfo> & { last_updated: number | null } {
     try {
       const row = this.db
         .prepare(
           `SELECT name, working_hours, location_url, shipping_details, instagram_url, website_url, mobile_numbers, last_updated
-           FROM business_info WHERE tenant_id = @tenant_id`
+           FROM business_info WHERE tenant_id = @tenant_id`,
         )
         .get({ tenant_id: tenantId }) as any;
 
@@ -146,11 +163,17 @@ class ConfigStore {
         shipping_details: row.shipping_details ?? null,
         instagram_url: row.instagram_url ?? null,
         website_url: row.website_url ?? null,
-        mobile_numbers: row.mobile_numbers ? JSON.parse(row.mobile_numbers) : null,
+        mobile_numbers: row.mobile_numbers
+          ? JSON.parse(row.mobile_numbers)
+          : null,
         last_updated: row.last_updated ? Number(row.last_updated) : null,
       };
     } catch (e) {
-      errorLogger.error({ msg: 'getBusinessInfo failed', tenantId, error: (e as Error)?.message || e });
+      errorLogger.error({
+        msg: "getBusinessInfo failed",
+        tenantId,
+        error: (e as Error)?.message || e,
+      });
       return {
         name: null,
         working_hours: null,
@@ -171,12 +194,30 @@ class ConfigStore {
 
       const merged: Required<BusinessInfo> = {
         name: info.name !== undefined ? info.name : current.name,
-        working_hours: info.working_hours !== undefined ? info.working_hours : current.working_hours,
-        location_url: info.location_url !== undefined ? info.location_url : current.location_url,
-        shipping_details: info.shipping_details !== undefined ? info.shipping_details : current.shipping_details,
-        instagram_url: info.instagram_url !== undefined ? info.instagram_url : current.instagram_url,
-        website_url: info.website_url !== undefined ? info.website_url : current.website_url,
-        mobile_numbers: info.mobile_numbers !== undefined ? info.mobile_numbers : (current as any).mobile_numbers,
+        working_hours:
+          info.working_hours !== undefined
+            ? info.working_hours
+            : current.working_hours,
+        location_url:
+          info.location_url !== undefined
+            ? info.location_url
+            : current.location_url,
+        shipping_details:
+          info.shipping_details !== undefined
+            ? info.shipping_details
+            : current.shipping_details,
+        instagram_url:
+          info.instagram_url !== undefined
+            ? info.instagram_url
+            : current.instagram_url,
+        website_url:
+          info.website_url !== undefined
+            ? info.website_url
+            : current.website_url,
+        mobile_numbers:
+          info.mobile_numbers !== undefined
+            ? info.mobile_numbers
+            : (current as any).mobile_numbers,
       };
 
       this.db
@@ -196,7 +237,7 @@ class ConfigStore {
             website_url = excluded.website_url,
             mobile_numbers = excluded.mobile_numbers,
             last_updated = excluded.last_updated
-        `
+        `,
         )
         .run({
           tenant_id: tenantId,
@@ -206,10 +247,16 @@ class ConfigStore {
           shipping_details: merged.shipping_details ?? null,
           instagram_url: merged.instagram_url ?? null,
           website_url: merged.website_url ?? null,
-          mobile_numbers: merged.mobile_numbers ? JSON.stringify(merged.mobile_numbers) : null,
+          mobile_numbers: merged.mobile_numbers
+            ? JSON.stringify(merged.mobile_numbers)
+            : null,
         });
     } catch (e) {
-      errorLogger.error({ msg: 'setBusinessInfo failed', tenantId, error: (e as Error)?.message || e });
+      errorLogger.error({
+        msg: "setBusinessInfo failed",
+        tenantId,
+        error: (e as Error)?.message || e,
+      });
     }
   }
 }

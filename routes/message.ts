@@ -24,7 +24,7 @@ router.post(
     } catch (error) {
       (res as any).sendError(500, error);
     }
-  }
+  },
 );
 
 router.post(
@@ -40,7 +40,7 @@ router.post(
       if (!tenantId || typeof tenantId !== "string" || !tenantId.trim()) {
         (res as any).sendError(
           400,
-          "tenantId is required as a query parameter"
+          "tenantId is required as a query parameter",
         );
         return;
       }
@@ -51,7 +51,7 @@ router.post(
     } catch (error) {
       (res as any).sendError(500, error);
     }
-  }
+  },
 );
 
 // Conversations are stored locally in SQLite (shared), not scoped by tenant in current schema.
@@ -71,7 +71,7 @@ router.get(
     } catch (error) {
       (res as any).sendError(500, error);
     }
-  }
+  },
 );
 
 router.get("/messages", async (req: Request, res: Response): Promise<void> => {

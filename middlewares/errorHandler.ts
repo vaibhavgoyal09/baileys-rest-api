@@ -1,22 +1,27 @@
-import { Request, Response } from 'express';
-import { errorLogger, logger } from '../utils/logger.js';
+import { Request, Response } from "express";
+import { errorLogger, logger } from "../utils/logger.js";
 
-const errorHandler = (req: Request, res: Response, statusCode: number = 500, data: any = {}): void => {
+const errorHandler = (
+  req: Request,
+  res: Response,
+  statusCode: number = 500,
+  data: any = {},
+): void => {
   try {
-    if (typeof data !== 'object') {
+    if (typeof data !== "object") {
       data = { message: data };
     }
 
     if (data?.code === 11000 || data?.code === 11001 || data?.code === 12582) {
       statusCode = 409;
-      data = { message: 'This record is already exist.' };
+      data = { message: "This record is already exist." };
     }
 
     if (data instanceof Error) {
-      data = { message: data.message || 'Something went wrong.' };
+      data = { message: data.message || "Something went wrong." };
     }
 
-    if (JSON.stringify(data) === '{}') {
+    if (JSON.stringify(data) === "{}") {
       res.sendStatus(500);
       errorLogger.error(data);
       logger.error(data);

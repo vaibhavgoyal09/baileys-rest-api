@@ -1,10 +1,10 @@
-import fs from 'fs';
-import fsp from 'fs/promises';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import readline from 'readline';
-import { logger, errorLogger } from '../utils/logger.js';
-import Store from './sqliteStore.js';
+import fs from "fs";
+import fsp from "fs/promises";
+import path from "path";
+import { fileURLToPath } from "url";
+import readline from "readline";
+import { logger, errorLogger } from "../utils/logger.js";
+import Store from "./sqliteStore.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -45,8 +45,12 @@ type IngestionConfig = {
   retry: RetryPolicy;
 };
 
-function nowMs() { return Date.now(); }
-function sleep(ms: number) { return new Promise(res => setTimeout(res, ms)); }
+function nowMs() {
+  return Date.now();
+}
+function sleep(ms: number) {
+  return new Promise((res) => setTimeout(res, ms));
+}
 function jitteredBackoff(attempt: number, base: number, max: number) {
   const exp = Math.min(max, base * Math.pow(2, attempt));
   const jitter = Math.floor(Math.random() * (exp * 0.2));
@@ -80,11 +84,13 @@ class Metrics {
 
   sampleWorkerUtilization(val: number) {
     this.workerUtilizationSamples.push(val);
-    if (this.workerUtilizationSamples.length > 1000) this.workerUtilizationSamples.shift();
+    if (this.workerUtilizationSamples.length > 1000)
+      this.workerUtilizationSamples.shift();
   }
   observeLatency(ms: number) {
     this.persistenceLatencies.push(ms);
-    if (this.persistenceLatencies.length > 5000) this.persistenceLatencies.shift();
+    if (this.persistenceLatencies.length > 5000)
+      this.persistenceLatencies.shift();
   }
   incError(code: string) {
     this.errors[code] = (this.errors[code] || 0) + 1;
@@ -102,13 +108,13 @@ class AppendOnlyLog {
 
   async open() {
     await fsp.mkdir(path.dirname(this.path), { recursive: true });
-    this.fd = await fsp.open(this.path, 'a+'); // read/append
+    this.fd = await fsp.open(this.path, "a+"); // read/append
   }
 
   async append(record: IngestRecord): Promise<void> {
     if (!this.fd) await this.open();
-    const line = JSON.stringify(record) + '\n';
-    await this.fd!.appendFile(line, 'utf8');
+    const line = JSON.stringify(record) + "\n";
+    await this.fd!.appendFile(line, "utf8");
     // fsync to ensure durability before ack
     await this.fd!.sync();
   }
@@ -123,7 +129,7 @@ class AppendOnlyLog {
   }
 
   createReadStream(start = 0) {
-    return fs.createReadStream(this.path, { start, encoding: 'utf8' });
+    return fs.createReadStream(this.path, { start, encoding: "utf8" });
   }
 }
 
@@ -137,7 +143,7 @@ class Checkpointer {
 
   async load(): Promise<number> {
     try {
-      const txt = await fsp.readFile(this.path, 'utf8');
+      const txt = await fsp.readFile(this.path, "utf8");
       const off = Number(txt.trim());
       if (!Number.isFinite(off)) return 0;
       this.currentOffset = off;
@@ -150,10 +156,12 @@ class Checkpointer {
   async save(offset: number): Promise<void> {
     this.currentOffset = offset;
     await fsp.mkdir(path.dirname(this.path), { recursive: true });
-    await fsp.writeFile(this.path, String(offset), 'utf8');
+    await fsp.writeFile(this.path, String(offset), "utf8");
   }
 
-  get offset() { return this.currentOffset; }
+  get offset() {
+    return this.currentOffset;
+  }
 }
 
 class AsyncBoundedQueue<T> {
@@ -166,7 +174,9 @@ class AsyncBoundedQueue<T> {
     this.capacity = capacity;
   }
 
-  size() { return this.buf.length; }
+  size() {
+    return this.buf.length;
+  }
 
   tryEnqueue(item: T): boolean {
     if (this.ended) return false;
@@ -193,7 +203,9 @@ class AsyncBoundedQueue<T> {
         continue;
       }
       if (this.ended) return;
-      const next = await new Promise<IteratorResult<T>>(res => this.waiters.push(res));
+      const next = await new Promise<IteratorResult<T>>((res) =>
+        this.waiters.push(res),
+      );
       if (next.done) return;
       else yield next.value!;
     }
@@ -211,11 +223,14 @@ class IngestionService {
   private workersRunning = false;
 
   constructor() {
-    const dataDir = path.join(__dirname, '..', 'data');
+    const dataDir = path.join(__dirname, "..", "data");
     const cfg: IngestionConfig = {
-      logPath: process.env.INGEST_LOG_PATH || path.join(dataDir, 'ingestion.log'),
-      checkpointPath: process.env.INGEST_CHECKPOINT_PATH || path.join(dataDir, 'ingestion.offset'),
-      dlqPath: process.env.INGEST_DLQ_PATH || path.join(dataDir, 'dlq.log'),
+      logPath:
+        process.env.INGEST_LOG_PATH || path.join(dataDir, "ingestion.log"),
+      checkpointPath:
+        process.env.INGEST_CHECKPOINT_PATH ||
+        path.join(dataDir, "ingestion.offset"),
+      dlqPath: process.env.INGEST_DLQ_PATH || path.join(dataDir, "dlq.log"),
       queueCapacity: Number(process.env.INGEST_QUEUE_CAPACITY || 5000),
       batchSize: Number(process.env.INGEST_BATCH_SIZE || 100),
       batchMaxWaitMs: Number(process.env.INGEST_BATCH_MAX_WAIT_MS || 250),
@@ -224,7 +239,9 @@ class IngestionService {
         baseMs: Number(process.env.INGEST_RETRY_BASE_MS || 100),
         maxMs: Number(process.env.INGEST_RETRY_MAX_MS || 5000),
         maxAttempts: Number(process.env.INGEST_RETRY_MAX_ATTEMPTS || 10),
-        maxHorizonMs: Number(process.env.INGEST_RETRY_MAX_HORIZON_MS || 10 * 60 * 1000),
+        maxHorizonMs: Number(
+          process.env.INGEST_RETRY_MAX_HORIZON_MS || 10 * 60 * 1000,
+        ),
       },
     };
 
@@ -237,11 +254,18 @@ class IngestionService {
 
   getMetricsSnapshot() {
     const utilAvg = this.metrics.workerUtilizationSamples.length
-      ? this.metrics.workerUtilizationSamples.reduce((a, b) => a + b, 0) / this.metrics.workerUtilizationSamples.length
+      ? this.metrics.workerUtilizationSamples.reduce((a, b) => a + b, 0) /
+        this.metrics.workerUtilizationSamples.length
       : 0;
-    const latencies = this.metrics.persistenceLatencies.slice().sort((a, b) => a - b);
-    const p50 = latencies.length ? latencies[Math.floor(0.5 * (latencies.length - 1))] : 0;
-    const p95 = latencies.length ? latencies[Math.floor(0.95 * (latencies.length - 1))] : 0;
+    const latencies = this.metrics.persistenceLatencies
+      .slice()
+      .sort((a, b) => a - b);
+    const p50 = latencies.length
+      ? latencies[Math.floor(0.5 * (latencies.length - 1))]
+      : 0;
+    const p95 = latencies.length
+      ? latencies[Math.floor(0.95 * (latencies.length - 1))]
+      : 0;
     return {
       counters: {
         received: this.metrics.received,
@@ -262,7 +286,7 @@ class IngestionService {
     await this.log.open();
     const startOffset = await this.checkpointer.load();
     logger.info({
-      msg: 'Ingestion service starting',
+      msg: "Ingestion service starting",
       logPath: this.config.logPath,
       checkpointPath: this.config.checkpointPath,
       startOffset,
@@ -271,18 +295,33 @@ class IngestionService {
       queueCapacity: this.config.queueCapacity,
     });
     this.startWorkers().catch((e) => {
-      errorLogger.error({ msg: 'Worker startup failure', error: e?.message || e });
+      errorLogger.error({
+        msg: "Worker startup failure",
+        error: e?.message || e,
+      });
     });
     this.startReplayLoop().catch((e) => {
-      errorLogger.error({ msg: 'Replay loop failure', error: e?.message || e });
+      errorLogger.error({ msg: "Replay loop failure", error: e?.message || e });
     });
     this.installShutdownHooks();
   }
 
-  async enqueueMessage(msg: MessageInfo): Promise<{ accepted: boolean; reason?: string; idempotencyKey: string; correlationId: string }> {
+  async enqueueMessage(
+    msg: MessageInfo,
+  ): Promise<{
+    accepted: boolean;
+    reason?: string;
+    idempotencyKey: string;
+    correlationId: string;
+  }> {
     // validate
     if (!msg || !msg.id || !msg.from) {
-      return { accepted: false, reason: 'invalid_message', idempotencyKey: '', correlationId: '' };
+      return {
+        accepted: false,
+        reason: "invalid_message",
+        idempotencyKey: "",
+        correlationId: "",
+      };
     }
 
     const record: IngestRecord = {
@@ -297,14 +336,19 @@ class IngestionService {
       await this.log.append(record);
       this.metrics.received += 1;
     } catch (e: any) {
-      this.metrics.incError('log_append_failed');
+      this.metrics.incError("log_append_failed");
       errorLogger.error({
-        msg: 'Failed to append ingest record to log',
+        msg: "Failed to append ingest record to log",
         error: e?.message || e,
         idempotencyKey: record.idempotencyKey,
       });
       // retriable
-      return { accepted: false, reason: 'log_append_failed', idempotencyKey: record.idempotencyKey, correlationId: record.correlationId };
+      return {
+        accepted: false,
+        reason: "log_append_failed",
+        idempotencyKey: record.idempotencyKey,
+        correlationId: record.correlationId,
+      };
     }
 
     // Best-effort enqueue into memory queue. If full, replay loop will still deliver from log.
@@ -314,16 +358,22 @@ class IngestionService {
     } else {
       // backpressure: queue is full; caller already acked due to durable log; return accepted with overflow info
       logger.warn({
-        msg: 'In-memory queue full; relying on log replay',
+        msg: "In-memory queue full; relying on log replay",
         queueSize: this.queue.size(),
         idempotencyKey: record.idempotencyKey,
       });
     }
 
-    return { accepted: true, idempotencyKey: record.idempotencyKey, correlationId: record.correlationId };
+    return {
+      accepted: true,
+      idempotencyKey: record.idempotencyKey,
+      correlationId: record.correlationId,
+    };
   }
 
-  async enqueueMessages(msgs: MessageInfo[]): Promise<{ accepted: boolean; countAccepted: number }> {
+  async enqueueMessages(
+    msgs: MessageInfo[],
+  ): Promise<{ accepted: boolean; countAccepted: number }> {
     let ok = 0;
     for (const m of msgs) {
       const res = await this.enqueueMessage(m);
@@ -337,7 +387,7 @@ class IngestionService {
     (global as any).__ingestionShutdownInstalled = true;
     const shutdown = async (signal: string) => {
       try {
-        logger.info({ msg: 'Shutting down ingestion service', signal });
+        logger.info({ msg: "Shutting down ingestion service", signal });
         // Stop accepting new work
         this.queue.end();
         // Allow some time for workers to flush
@@ -346,8 +396,8 @@ class IngestionService {
         process.exit(0);
       }
     };
-    process.on('SIGINT', () => shutdown('SIGINT'));
-    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on("SIGINT", () => shutdown("SIGINT"));
+    process.on("SIGTERM", () => shutdown("SIGTERM"));
   }
 
   private async startWorkers() {
@@ -355,7 +405,11 @@ class IngestionService {
     this.workersRunning = true;
     for (let i = 0; i < this.config.workers; i += 1) {
       this.workerLoop(i).catch((e) => {
-        errorLogger.error({ msg: 'Worker loop crashed', worker: i, error: e?.message || e });
+        errorLogger.error({
+          msg: "Worker loop crashed",
+          worker: i,
+          error: e?.message || e,
+        });
       });
     }
   }
@@ -366,8 +420,14 @@ class IngestionService {
     for await (const item of this.queue) {
       batch.push(item);
       const age = nowMs() - lastFlush;
-      if (batch.length >= this.config.batchSize || age >= this.config.batchMaxWaitMs) {
-        await this.persistBatchWithRetry(workerId, batch.splice(0, batch.length));
+      if (
+        batch.length >= this.config.batchSize ||
+        age >= this.config.batchMaxWaitMs
+      ) {
+        await this.persistBatchWithRetry(
+          workerId,
+          batch.splice(0, batch.length),
+        );
         lastFlush = nowMs();
       }
       // utilization sampling: simplistic
@@ -379,7 +439,10 @@ class IngestionService {
     }
   }
 
-  private async persistBatchWithRetry(workerId: number, records: IngestRecord[]) {
+  private async persistBatchWithRetry(
+    workerId: number,
+    records: IngestRecord[],
+  ) {
     const started = nowMs();
     try {
       await this.persistBatchSplitOnFailure(records, 0);
@@ -387,29 +450,35 @@ class IngestionService {
       this.metrics.observeLatency(took);
       this.metrics.persisted += records.length;
       logger.debug({
-        msg: 'Persisted batch',
+        msg: "Persisted batch",
         workerId,
         size: records.length,
         tookMs: took,
       });
     } catch (e: any) {
       // Should not reach here; failures are handled with DLQ inside persistBatchSplitOnFailure
-      errorLogger.error({ msg: 'Unhandled persistBatchWithRetry error', error: e?.message || e });
+      errorLogger.error({
+        msg: "Unhandled persistBatchWithRetry error",
+        error: e?.message || e,
+      });
     }
   }
 
   private isTransientError(err: any): boolean {
     const msg = (err?.message || String(err)).toLowerCase();
     return (
-      msg.includes('busy') ||
-      msg.includes('locked') ||
-      msg.includes('timeout') ||
-      msg.includes('ioerr') ||
-      msg.includes('database is locked')
+      msg.includes("busy") ||
+      msg.includes("locked") ||
+      msg.includes("timeout") ||
+      msg.includes("ioerr") ||
+      msg.includes("database is locked")
     );
   }
 
-  private async persistBatchSplitOnFailure(records: IngestRecord[], depth: number): Promise<void> {
+  private async persistBatchSplitOnFailure(
+    records: IngestRecord[],
+    depth: number,
+  ): Promise<void> {
     if (records.length === 0) return;
 
     try {
@@ -432,7 +501,7 @@ class IngestionService {
 
   private async persistOnce(records: IngestRecord[]) {
     // Idempotent batch insert using upsert/ignore semantics in store
-    const msgs = records.map(r => ({
+    const msgs = records.map((r) => ({
       ...r.payload,
       idempotencyKey: r.idempotencyKey,
     }));
@@ -450,14 +519,22 @@ class IngestionService {
         } catch (e: any) {
           this.metrics.retried += 1;
           const age = nowMs() - firstAt;
-          if (!this.isTransientError(e) || attempt >= this.config.retry.maxAttempts || age >= this.config.retry.maxHorizonMs) {
+          if (
+            !this.isTransientError(e) ||
+            attempt >= this.config.retry.maxAttempts ||
+            age >= this.config.retry.maxHorizonMs
+          ) {
             await this.writeToDlq(rec, e);
             break;
           }
-          const wait = jitteredBackoff(attempt, this.config.retry.baseMs, this.config.retry.maxMs);
+          const wait = jitteredBackoff(
+            attempt,
+            this.config.retry.baseMs,
+            this.config.retry.maxMs,
+          );
           attempt += 1;
           logger.warn({
-            msg: 'Transient error persisting single record, will retry',
+            msg: "Transient error persisting single record, will retry",
             idempotencyKey: rec.idempotencyKey,
             attempt,
             waitMs: wait,
@@ -471,16 +548,27 @@ class IngestionService {
 
   private async writeToDlq(rec: IngestRecord, error: any) {
     try {
-      await fsp.appendFile(this.dlqPath, JSON.stringify({ ...rec, error: String(error?.message || error), deadLetteredAt: nowMs() }) + '\n', 'utf8');
+      await fsp.appendFile(
+        this.dlqPath,
+        JSON.stringify({
+          ...rec,
+          error: String(error?.message || error),
+          deadLetteredAt: nowMs(),
+        }) + "\n",
+        "utf8",
+      );
       this.metrics.deadLettered += 1;
       errorLogger.error({
-        msg: 'Record moved to DLQ',
+        msg: "Record moved to DLQ",
         idempotencyKey: rec.idempotencyKey,
         error: error?.message || error,
       });
     } catch (writeErr: any) {
-      this.metrics.incError('dlq_write_failed');
-      errorLogger.error({ msg: 'Failed to write DLQ record', error: writeErr?.message || writeErr });
+      this.metrics.incError("dlq_write_failed");
+      errorLogger.error({
+        msg: "Failed to write DLQ record",
+        error: writeErr?.message || writeErr,
+      });
     }
   }
 
@@ -506,11 +594,14 @@ class IngestionService {
     while (true) {
       try {
         const stream = this.log.createReadStream(offset);
-        const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
+        const rl = readline.createInterface({
+          input: stream,
+          crlfDelay: Infinity,
+        });
 
         let consumedBytes = 0;
         for await (const line of rl) {
-          const lineBytes = Buffer.byteLength(line + '\n', 'utf8');
+          const lineBytes = Buffer.byteLength(line + "\n", "utf8");
           consumedBytes += lineBytes;
 
           if (!line.trim()) {
@@ -532,10 +623,14 @@ class IngestionService {
               await this.checkpointer.save(offset);
             }
           } catch (e: any) {
-            this.metrics.incError('replay_parse_error');
-            errorLogger.error({ msg: 'Failed to parse replay line', error: e?.message || e, atOffset: offset });
+            this.metrics.incError("replay_parse_error");
+            errorLogger.error({
+              msg: "Failed to parse replay line",
+              error: e?.message || e,
+              atOffset: offset,
+            });
             // Skip bad line but update offset to avoid infinite loop
-            offset += Buffer.byteLength(line + '\n', 'utf8');
+            offset += Buffer.byteLength(line + "\n", "utf8");
             await this.checkpointer.save(offset);
           }
         }
@@ -554,8 +649,8 @@ class IngestionService {
           await sleep(300);
         }
       } catch (e: any) {
-        this.metrics.incError('replay_loop_error');
-        errorLogger.error({ msg: 'Replay loop error', error: e?.message || e });
+        this.metrics.incError("replay_loop_error");
+        errorLogger.error({ msg: "Replay loop error", error: e?.message || e });
         await sleep(500);
       }
     }

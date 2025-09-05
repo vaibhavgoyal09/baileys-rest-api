@@ -136,7 +136,7 @@ class WhatsAppService {
   }
 
   async initialize(
-    isReconnecting: boolean = false
+    isReconnecting: boolean = false,
   ): Promise<WhatsAppServiceResult> {
     try {
       // Check if session directory exists
@@ -157,20 +157,20 @@ class WhatsAppService {
         this.reconnectAttempts += 1;
         if (this.reconnectAttempts > this.MAX_RECONNECT_ATTEMPTS) {
           logger.warn(
-            `Maximum reconnection attempts (${this.MAX_RECONNECT_ATTEMPTS}) exceeded`
+            `Maximum reconnection attempts (${this.MAX_RECONNECT_ATTEMPTS}) exceeded`,
           );
           await this.handleLogout("max_attempts_exceeded");
           return await this.initialize(false);
         }
         logger.info(
-          `Attempting to reconnect... (Attempt ${this.reconnectAttempts}/${this.MAX_RECONNECT_ATTEMPTS})`
+          `Attempting to reconnect... (Attempt ${this.reconnectAttempts}/${this.MAX_RECONNECT_ATTEMPTS})`,
         );
       } else {
         this.resetReconnectAttempts();
       }
 
       const { state, saveCreds } = await useMultiFileAuthState(
-        this.sessionPath
+        this.sessionPath,
       );
 
       this.sock = makeWASocket({
@@ -256,7 +256,6 @@ class WhatsAppService {
       this.sock.ev.on("creds.update", saveCreds);
 
       // removed duplicate empty handler for messaging-history.set (handled below with processHistory)
-      
 
       this.sock.ev.on("chats.set", ({ chats }: any) => {
         try {
@@ -483,13 +482,10 @@ class WhatsAppService {
 
                 // Send to webhook with business details
                 const businessInfo = Store.getBusinessInfo();
-                await WhatsAppService.notifyWebhook(
-                  "message.received",
-                  {
-                    message: messageInfo,
-                    business: businessInfo
-                  }
-                );
+                await WhatsAppService.notifyWebhook("message.received", {
+                  message: messageInfo,
+                  business: businessInfo,
+                });
                 logger.info({
                   msg: "New message processed",
                   messageId: messageInfo.id,
@@ -498,10 +494,10 @@ class WhatsAppService {
                   content: messageInfo.content,
                   isGroup: messageInfo.isGroup,
                   timestamp: new Date(
-                    messageInfo.timestamp * 1000
+                    messageInfo.timestamp * 1000,
                   ).toISOString(),
                 });
-              })
+              }),
             );
           } catch (error: any) {
             errorLogger.error({
@@ -563,7 +559,7 @@ class WhatsAppService {
   }
 
   async handleLogout(
-    reason: string = "normal_logout"
+    reason: string = "normal_logout",
   ): Promise<WhatsAppServiceResult> {
     try {
       // Clean up session files
@@ -628,7 +624,7 @@ class WhatsAppService {
   }
 
   static async notifyWebhook(event: string, data: any): Promise<void> {
-    const webhookUrl = ConfigStore.getWebhookUrl('default');
+    const webhookUrl = ConfigStore.getWebhookUrl("default");
     if (!webhookUrl) {
       logger.warn({
         msg: "Webhook URL not configured, skipping notification",
@@ -653,7 +649,7 @@ class WhatsAppService {
 
       if (!response.ok) {
         throw new Error(
-          `Webhook request failed with status ${response.status}: ${response.statusText}`
+          `Webhook request failed with status ${response.status}: ${response.statusText}`,
         );
       }
 
@@ -695,31 +691,44 @@ class WhatsAppService {
 
       if (!this.sock || !this.isConnected) {
         // no active connection, just return what we have
-        return { stored: existing, fetched: null, persisted: false, reason: 'not_connected' };
+        return {
+          stored: existing,
+          fetched: null,
+          persisted: false,
+          reason: "not_connected",
+        };
       }
 
       // Try to determine self JID and name
       const meJid: string | null =
         (this.sock.user && (this.sock.user.id || this.sock.user.jid)) ||
-        (this.sock.authState && this.sock.authState.creds && this.sock.authState.creds.me && (this.sock.authState.creds.me.id || this.sock.authState.creds.me.jid)) ||
+        (this.sock.authState &&
+          this.sock.authState.creds &&
+          this.sock.authState.creds.me &&
+          (this.sock.authState.creds.me.id ||
+            this.sock.authState.creds.me.jid)) ||
         null;
 
       const meName: string | null =
         (this.sock.user && (this.sock.user.name || this.sock.user.pushName)) ||
-        (this.sock.authState && this.sock.authState.creds && this.sock.authState.creds.me && (this.sock.authState.creds.me.name || this.sock.authState.creds.me.pushName)) ||
+        (this.sock.authState &&
+          this.sock.authState.creds &&
+          this.sock.authState.creds.me &&
+          (this.sock.authState.creds.me.name ||
+            this.sock.authState.creds.me.pushName)) ||
         null;
 
       let fetchedProfile: any | null = null;
 
       // Baileys business profile API (some versions support getBusinessProfile)
       try {
-        if (typeof this.sock.getBusinessProfile === 'function' && meJid) {
+        if (typeof this.sock.getBusinessProfile === "function" && meJid) {
           fetchedProfile = await this.sock.getBusinessProfile(meJid);
         }
       } catch (e) {
         // ignore if not available
         errorLogger.error({
-          msg: 'getBusinessProfile failed',
+          msg: "getBusinessProfile failed",
           error: (e as Error)?.message || e,
         });
       }
@@ -727,7 +736,7 @@ class WhatsAppService {
       // Also try to fetch "about" / status text if available (not strictly business)
       let about: string | null = null;
       try {
-        if (typeof this.sock.fetchStatus === 'function' && meJid) {
+        if (typeof this.sock.fetchStatus === "function" && meJid) {
           const s = await this.sock.fetchStatus(meJid);
           about = s?.status || null;
         }
@@ -738,7 +747,12 @@ class WhatsAppService {
       // Map fields we care about
       // Many of these may not be available; map best-effort from fetchedProfile
       const mapped = {
-        name: meName || fetchedProfile?.title || fetchedProfile?.businessName || existing.name || null,
+        name:
+          meName ||
+          fetchedProfile?.title ||
+          fetchedProfile?.businessName ||
+          existing.name ||
+          null,
         working_hours: fetchedProfile?.businessHours
           ? JSON.stringify(fetchedProfile.businessHours)
           : existing.working_hours || null,
@@ -747,21 +761,28 @@ class WhatsAppService {
           : existing.location_url || null, // no direct URL; could be composed externally
         shipping_details: existing.shipping_details || null, // not available via WA — keep existing
         instagram_url: Array.isArray(fetchedProfile?.connectedAccounts)
-          ? (fetchedProfile.connectedAccounts.find((a: any) => a?.type?.toLowerCase?.() === 'instagram')?.value || existing.instagram_url || null)
+          ? fetchedProfile.connectedAccounts.find(
+              (a: any) => a?.type?.toLowerCase?.() === "instagram",
+            )?.value ||
+            existing.instagram_url ||
+            null
           : existing.instagram_url || null,
         website_url: (() => {
           // Some versions expose websites array
-          const websites = fetchedProfile?.websites || fetchedProfile?.website || [];
+          const websites =
+            fetchedProfile?.websites || fetchedProfile?.website || [];
           if (Array.isArray(websites) && websites.length) return websites[0];
-          if (typeof websites === 'string' && websites) return websites;
+          if (typeof websites === "string" && websites) return websites;
           return existing.website_url || null;
         })(),
         mobile_numbers: (() => {
           // We know our own number; we can add it if derivable from JID
-          const nums = Array.isArray(existing.mobile_numbers) ? [...existing.mobile_numbers] : [];
-          if (meJid && meJid.includes('@')) {
-            const base = (meJid ?? '').split('@')[0];
-            const digits = (base || '').replace(/[^\d]/g, '');
+          const nums = Array.isArray(existing.mobile_numbers)
+            ? [...existing.mobile_numbers]
+            : [];
+          if (meJid && meJid.includes("@")) {
+            const base = (meJid ?? "").split("@")[0];
+            const digits = (base || "").replace(/[^\d]/g, "");
             if (digits && !nums.includes(digits)) nums.push(digits);
           }
           return nums.length ? nums : existing.mobile_numbers || null;
@@ -788,14 +809,14 @@ class WhatsAppService {
       };
     } catch (e) {
       errorLogger.error({
-        msg: 'refreshBusinessInfo failed',
+        msg: "refreshBusinessInfo failed",
         error: (e as Error)?.message || e,
       });
       return {
         stored: Store.getBusinessInfo(),
         fetched: null,
         persisted: false,
-        reason: 'exception',
+        reason: "exception",
       };
     }
   }
@@ -878,7 +899,11 @@ class WhatsAppService {
   }
 
   // paginate older history for a single chat using fetchMessageHistory (<=50 per page)
-  private async syncHistoryForChat(jid: string, maxPages = 6, batch = 50): Promise<void> {
+  private async syncHistoryForChat(
+    jid: string,
+    maxPages = 6,
+    batch = 50,
+  ): Promise<void> {
     try {
       let page = 0;
       // we require an oldest anchor to go further back in history
@@ -905,7 +930,11 @@ class WhatsAppService {
 
         try {
           // messages will arrive via `messaging.history-set` and be persisted by our handler
-          await this.sock.fetchMessageHistory(batch, anchor.key, anchor.messageTimestamp);
+          await this.sock.fetchMessageHistory(
+            batch,
+            anchor.key,
+            anchor.messageTimestamp,
+          );
         } catch (e) {
           errorLogger.error({
             msg: "fetchMessageHistory failed",
@@ -967,7 +996,8 @@ class WhatsAppService {
       return;
     }
     try {
-      const conversations = Store.listConversations({ limit: 1000, cursor: null }) || [];
+      const conversations =
+        Store.listConversations({ limit: 1000, cursor: null }) || [];
       logger.info({
         msg: "Starting history backfill on reconnect",
         chatCount: conversations.length,
@@ -1063,7 +1093,7 @@ class WhatsAppService {
     try {
       // Check if the number exists on WhatsApp
       const [result] = await this.sock.onWhatsApp(
-        phoneNumber.replace(/[^\d]/g, "")
+        phoneNumber.replace(/[^\d]/g, ""),
       );
 
       if (result) {

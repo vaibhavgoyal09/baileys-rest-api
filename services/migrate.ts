@@ -1,8 +1,8 @@
-import path from 'path';
-import { fileURLToPath } from 'url';
-import Database from 'better-sqlite3';
-import { logger, errorLogger } from '../utils/logger.js';
-import configStore from './configStore.js';
+import path from "path";
+import { fileURLToPath } from "url";
+import Database from "better-sqlite3";
+import { logger, errorLogger } from "../utils/logger.js";
+import configStore from "./configStore.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -15,7 +15,7 @@ class MigrationService {
   private oldDbPath: string;
 
   constructor() {
-    this.oldDbPath = path.join(__dirname, '..', 'data', 'whatsapp.db');
+    this.oldDbPath = path.join(__dirname, "..", "data", "whatsapp.db");
   }
 
   /**
@@ -23,18 +23,25 @@ class MigrationService {
    */
   async shouldMigrate(): Promise<boolean> {
     try {
-      if (!require('fs').existsSync(this.oldDbPath)) {
-        logger.debug({ msg: 'Old database does not exist, skipping migration' });
+      if (!require("fs").existsSync(this.oldDbPath)) {
+        logger.debug({
+          msg: "Old database does not exist, skipping migration",
+        });
         return false;
       }
 
       const oldDb = new Database(this.oldDbPath);
-      const row = oldDb.prepare('SELECT COUNT(*) as count FROM business_info WHERE id = 1').get() as any;
+      const row = oldDb
+        .prepare("SELECT COUNT(*) as count FROM business_info WHERE id = 1")
+        .get() as any;
       oldDb.close();
 
       return row.count > 0;
     } catch (error) {
-      errorLogger.error({ msg: 'Error checking migration need', error: (error as Error).message });
+      errorLogger.error({
+        msg: "Error checking migration need",
+        error: (error as Error).message,
+      });
       return false;
     }
   }
@@ -44,24 +51,32 @@ class MigrationService {
    * Uses 'default' as the tenant ID for migrated data
    */
   async migrateBusinessInfo(): Promise<void> {
-    const tenantId = 'default';
+    const tenantId = "default";
     let oldDb: Database.Database | null = null;
 
     try {
-      if (!require('fs').existsSync(this.oldDbPath)) {
-        logger.info({ msg: 'Old database not found, skipping business info migration' });
+      if (!require("fs").existsSync(this.oldDbPath)) {
+        logger.info({
+          msg: "Old database not found, skipping business info migration",
+        });
         return;
       }
 
       oldDb = new Database(this.oldDbPath);
-      const row = oldDb.prepare(`
+      const row = oldDb
+        .prepare(
+          `
         SELECT name, working_hours, location_url, shipping_details, 
                instagram_url, website_url, mobile_numbers, last_updated
         FROM business_info WHERE id = 1
-      `).get() as any;
+      `,
+        )
+        .get() as any;
 
       if (!row) {
-        logger.info({ msg: 'No business info found in old database, skipping migration' });
+        logger.info({
+          msg: "No business info found in old database, skipping migration",
+        });
         return;
       }
 
@@ -72,19 +87,23 @@ class MigrationService {
         shipping_details: row.shipping_details ?? null,
         instagram_url: row.instagram_url ?? null,
         website_url: row.website_url ?? null,
-        mobile_numbers: row.mobile_numbers ? JSON.parse(row.mobile_numbers) : null,
+        mobile_numbers: row.mobile_numbers
+          ? JSON.parse(row.mobile_numbers)
+          : null,
       };
 
       configStore.setBusinessInfo(tenantId, businessInfo);
 
       logger.info({
-        msg: 'Business info migrated successfully',
+        msg: "Business info migrated successfully",
         tenantId,
-        migratedData: businessInfo
+        migratedData: businessInfo,
       });
-
     } catch (error) {
-      errorLogger.error({ msg: 'Business info migration failed', error: (error as Error).message });
+      errorLogger.error({
+        msg: "Business info migration failed",
+        error: (error as Error).message,
+      });
       throw error;
     } finally {
       if (oldDb) {
@@ -97,26 +116,29 @@ class MigrationService {
    * Initialize default tenant configuration if needed
    */
   async initializeDefaultTenant(): Promise<void> {
-    const tenantId = 'default';
-    
+    const tenantId = "default";
+
     try {
       // Ensure default tenant exists with empty config
       configStore.ensureTenant(tenantId);
-      
+
       // If WEBHOOK_URL environment variable is set, use it for default tenant
       const webhookUrl = process.env.WEBHOOK_URL;
       if (webhookUrl) {
         configStore.upsertUserConfig(tenantId, { webhook_url: webhookUrl });
         logger.info({
-          msg: 'Default tenant webhook URL set from environment variable',
+          msg: "Default tenant webhook URL set from environment variable",
           tenantId,
-          webhookUrl
+          webhookUrl,
         });
       }
-      
-      logger.debug({ msg: 'Default tenant initialized', tenantId });
+
+      logger.debug({ msg: "Default tenant initialized", tenantId });
     } catch (error) {
-      errorLogger.error({ msg: 'Default tenant initialization failed', error: (error as Error).message });
+      errorLogger.error({
+        msg: "Default tenant initialization failed",
+        error: (error as Error).message,
+      });
     }
   }
 
@@ -125,7 +147,7 @@ class MigrationService {
    */
   async runMigrations(): Promise<void> {
     try {
-      logger.info({ msg: 'Starting data migration process' });
+      logger.info({ msg: "Starting data migration process" });
 
       // Initialize default tenant first
       await this.initializeDefaultTenant();
@@ -133,15 +155,20 @@ class MigrationService {
       // Check if migration is needed and perform it
       const shouldMigrate = await this.shouldMigrate();
       if (shouldMigrate) {
-        logger.info({ msg: 'Migration needed, proceeding with data migration' });
+        logger.info({
+          msg: "Migration needed, proceeding with data migration",
+        });
         await this.migrateBusinessInfo();
       } else {
-        logger.info({ msg: 'No migration needed, skipping data migration' });
+        logger.info({ msg: "No migration needed, skipping data migration" });
       }
 
-      logger.info({ msg: 'Data migration process completed successfully' });
+      logger.info({ msg: "Data migration process completed successfully" });
     } catch (error) {
-      errorLogger.error({ msg: 'Data migration process failed', error: (error as Error).message });
+      errorLogger.error({
+        msg: "Data migration process failed",
+        error: (error as Error).message,
+      });
       throw error;
     }
   }
