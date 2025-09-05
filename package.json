@@ -6,7 +6,7 @@
   "main": "dist/app.js",
   "scripts": {
     "build": "tsc",
-    "start": "npx tsc && node dist/app.js",
+    "start": "tsc && node dist/app.js",
     "dev": "nodemon --exec ts-node --esm app.ts",
     "clean": "rm -rf dist"
   },
@@ -26,6 +26,7 @@
   "dependencies": {
     "@hapi/boom": "^10.0.1",
     "@naanzitos/baileys-make-in-memory-store": "^1.0.5",
+    "@types/jsonwebtoken": "^9.0.10",
     "@whiskeysockets/baileys": "^6.7.19",
     "bcrypt": "^5.1.1",
     "better-sqlite3": "^12.2.0",
@@ -33,6 +34,7 @@
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "joi": "^17.12.3",
+    "jsonwebtoken": "^9.0.2",
     "pino": "^8.20.0",
     "pino-pretty": "^11.0.0",
     "qrcode": "^1.5.4",

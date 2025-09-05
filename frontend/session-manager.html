@@ -134,12 +134,15 @@
             <input type="text" id="api-url" value="http://localhost:3001">
         </div>
         <div class="form-group">
-            <label for="access-token">Access Token:</label>
-            <input type="password" id="access-token" placeholder="Enter your ACCESS_TOKEN_SECRET">
+            <label>Current Tenant:</label>
+            <div id="current-tenant" style="padding: 8px; background-color: #eef6ff; border-radius: 4px; border: 1px solid #d6e8ff;"></div>
         </div>
-        <button id="start-btn">Start Session</button>
-        <button id="status-btn">Check Status</button>
-        <button id="logout-btn">Logout</button>
+        <div class="btn-row" style="margin-bottom: 20px;">
+            <button id="start-btn">Start Session</button>
+            <button id="status-btn">Check Status</button>
+            <button id="logout-btn">Logout</button>
+            <button id="user-management-btn" style="background-color: #6c757d;">User Management</button>
+        </div>
 
         <div class="section">
             <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
@@ -221,7 +224,7 @@
 
     <script>
         const apiUrlInput = document.getElementById('api-url');
-        const accessTokenInput = document.getElementById('access-token');
+        const currentTenantDisplay = document.getElementById('current-tenant');
         const startBtn = document.getElementById('start-btn');
         const statusBtn = document.getElementById('status-btn');
         const logoutBtn = document.getElementById('logout-btn');
@@ -233,6 +236,7 @@
         const conversationJidInput = document.getElementById('conversation-jid');
         const fetchMessagesBtn = document.getElementById('fetch-messages-btn');
         const responseContainer = document.getElementById('response-container');
+        const userManagementBtn = document.getElementById('user-management-btn');
 
         // Business Info Elements
         const businessLoadBtn = document.getElementById('business-load-btn');
@@ -249,14 +253,15 @@
         const businessStatus = document.getElementById('business-status');
 
         function getAuthHeaders() {
-            const token = accessTokenInput.value;
+            const token = localStorage.getItem('jwtToken');
             if (!token) {
-                alert('Please enter access token');
+                alert('Please login first');
+                window.location.href = 'login.html';
                 return null;
             }
             return {
                 'Content-Type': 'application/json',
-                'x-access-token': token
+                'Authorization': `Bearer ${token}`
             };
         }
 
@@ -467,6 +472,13 @@
                 const data = await response.json();
                 if (response.ok) {
                     showResponse(data);
+                    // Clear local storage and redirect to login
+                    localStorage.removeItem('jwtToken');
+                    localStorage.removeItem('tenantId');
+                    localStorage.removeItem('apiUrl');
+                    setTimeout(() => {
+                        window.location.href = 'login.html';
+                    }, 2000);
                 } else {
                     showResponse(data, true);
                 }
@@ -608,6 +620,32 @@
 
             fetchMessagesBtn.disabled = false;
             fetchMessagesBtn.textContent = 'Fetch Messages';
+        });
+
+        // User management navigation
+        userManagementBtn.addEventListener('click', () => {
+            window.location.href = 'user-management.html';
+        });
+
+        // Check authentication on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            const token = localStorage.getItem('jwtToken');
+            const tenantId = localStorage.getItem('tenantId');
+            const savedApiUrl = localStorage.getItem('apiUrl');
+            
+            if (!token || !tenantId) {
+                alert('Please login first');
+                window.location.href = 'login.html';
+                return;
+            }
+
+            // Set API URL if saved
+            if (savedApiUrl) {
+                apiUrlInput.value = savedApiUrl;
+            }
+
+            // Display current tenant
+            currentTenantDisplay.textContent = tenantId;
         });
     </script>
 </body>

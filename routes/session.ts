@@ -3,7 +3,7 @@ import QRCode from 'qrcode';
 
 const router = express.Router();
 import verifyToken from '../middlewares/verifyToken.js';
-import WhatsAppService from '../services/baileys.js';
+import WAManager from '../services/waManager.js';
 
 async function generateQRBase64(text: string): Promise<string> {
   try {
@@ -18,9 +18,11 @@ async function generateQRBase64(text: string): Promise<string> {
   }
 }
 
+// Start or resume a session for the authenticated tenant
 router.post('/start', verifyToken, async (req: Request, res: Response): Promise<void> => {
   try {
-    const result = await WhatsAppService.initialize();
+    const tenantId = (req as any).user?.userId as string;
+    const result = await WAManager.initialize(tenantId);
 
     if (!result.success) {
       (res as any).sendError(500, result);
@@ -44,7 +46,8 @@ router.post('/start', verifyToken, async (req: Request, res: Response): Promise<
 
 router.get('/status', verifyToken, async (req: Request, res: Response): Promise<void> => {
   try {
-    const status = WhatsAppService.getConnectionStatus();
+    const tenantId = (req as any).user?.userId as string;
+    const status = WAManager.getConnectionStatus(tenantId);
 
     if (status.qr) {
       status.qrBase64 = await generateQRBase64(status.qr);
@@ -61,7 +64,8 @@ router.get('/status', verifyToken, async (req: Request, res: Response): Promise<
 
 router.post('/logout', verifyToken, async (req: Request, res: Response): Promise<void> => {
   try {
-    const result = await WhatsAppService.logout();
+    const tenantId = (req as any).user?.userId as string;
+    const result = await WAManager.logout(tenantId);
     if (result.success) {
       (res as any).sendResponse(200, result);
     } else {

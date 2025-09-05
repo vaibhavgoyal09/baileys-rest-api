@@ -1,19 +1,26 @@
 import { Request, Response, NextFunction } from 'express';
-
-const { ACCESS_TOKEN_SECRET } = process.env;
+import { verifyJwt } from '../utils/jwt.js';
 
 const verifyToken = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-  if (!req.headers['x-access-token']) {
-    (res as any).sendError(401, 'Unauthorized access: No token provided');
-    return;
-  }
+  try {
+    // Accept Authorization: Bearer <jwt> or x-access-token: <jwt>
+    const authHeader = req.headers.authorization || '';
+    const bearer = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
+    const token = bearer || (typeof req.headers['x-access-token'] === 'string' ? String(req.headers['x-access-token']) : undefined);
 
-  if (req.headers['x-access-token'] !== ACCESS_TOKEN_SECRET) {
-    (res as any).sendError(401, 'Unauthorized access: Invalid token');
-    return;
-  }
+    console.log(token);
 
-  next();
+    if (!token) {
+      (res as any).sendError(401, 'Unauthorized: token missing');
+      return;
+    }
+
+    const payload = verifyJwt(token);
+    (req as any).user = { userId: payload.userId };
+    next();
+  } catch (e: any) {
+    (res as any).sendError(401, 'Unauthorized: invalid token');
+  }
 };
 
 export default verifyToken;

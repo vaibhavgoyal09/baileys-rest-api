@@ -12,6 +12,7 @@ import fs from "fs/promises";
 import { logger, errorLogger } from "../utils/logger.js";
 import Store, { Chat } from "./sqliteStore.js";
 import ingestion from "./ingestion.js";
+import ConfigStore from "./configStore.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -627,7 +628,7 @@ class WhatsAppService {
   }
 
   static async notifyWebhook(event: string, data: any): Promise<void> {
-    const webhookUrl = process.env.WEBHOOK_URL;
+    const webhookUrl = ConfigStore.getWebhookUrl('default');
     if (!webhookUrl) {
       logger.warn({
         msg: "Webhook URL not configured, skipping notification",

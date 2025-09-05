@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Baileys REST API - User Management</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #eaeaea;
+        }
+        h1 {
+            color: #333;
+            margin: 0;
+        }
+        .nav-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 8px 28px rgba(0,0,0,0.12);
+            border: 1px solid #eaeaea;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
+        }
+        button {
+            padding: 12px 24px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .btn-secondary {
+            background-color: #6c757d;
+        }
+        .btn-secondary:hover {
+            background-color: #545b62;
+        }
+        .btn-danger {
+            background-color: #dc3545;
+        }
+        .btn-danger:hover {
+            background-color: #c82333;
+        }
+        .error {
+            color: #dc3545;
+            font-size: 14px;
+            margin-top: 5px;
+            display: none;
+        }
+        .success {
+            color: #28a745;
+            font-size: 14px;
+            margin-top: 5px;
+            display: none;
+        }
+        .user-list {
+            margin-top: 30px;
+        }
+        .user-card {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+        }
+        .user-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .user-actions {
+            display: flex;
+            gap: 10px;
+        }
+        .user-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        .detail-item {
+            background: white;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #e9ecef;
+        }
+        .detail-label {
+            font-size: 12px;
+            color: #6c757d;
+            margin-bottom: 5px;
+        }
+        .detail-value {
+            font-weight: 500;
+            word-break: break-word;
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #eef0f3;
+            border-radius: 10px;
+            background: linear-gradient(180deg, #ffffff 0%, #fafbfc 100%);
+        }
+        .section h2 {
+            margin-top: 0;
+            color: #1f2d3d;
+            border-bottom: 2px solid #eef0f3;
+            padding-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>User Management</h1>
+        <div class="nav-buttons">
+            <button class="btn-secondary" onclick="window.location.href='session-manager.html'">Session Manager</button>
+            <button class="btn-secondary" onclick="window.location.href='login.html'">Logout</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="form-group">
+            <label for="api-url">API Server URL:</label>
+            <input type="text" id="api-url" value="http://localhost:3001">
+        </div>
+
+        <div class="section">
+            <h2>Current User</h2>
+            <div id="current-user-info" class="user-card">
+                <div class="user-header">
+                    <h3 id="current-tenant-name">Loading...</h3>
+                </div>
+                <div class="user-details">
+                    <div class="detail-item">
+                        <div class="detail-label">Tenant ID</div>
+                        <div class="detail-value" id="current-tenant-id">-</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Webhook URL</div>
+                        <div class="detail-value" id="current-webhook-url">-</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Session Status</div>
+                        <div class="detail-value" id="current-session-status">-</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Created At</div>
+                        <div class="detail-value" id="current-created-at">-</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Update Webhook URL</h2>
+            <div class="form-group">
+                <label for="webhook-url">New Webhook URL:</label>
+                <input type="url" id="webhook-url" placeholder="https://your-webhook.com">
+                <div class="error" id="webhook-error"></div>
+            </div>
+            <button id="update-webhook-btn">Update Webhook</button>
+            <div class="success" id="webhook-success"></div>
+        </div>
+
+        <div class="section">
+            <h2>All Users</h2>
+            <button id="refresh-users-btn">Refresh Users List</button>
+            <div id="users-list" class="user-list">
+                <p>Click "Refresh Users List" to load users...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const apiUrlInput = document.getElementById('api-url');
+        const currentTenantName = document.getElementById('current-tenant-name');
+        const currentTenantId = document.getElementById('current-tenant-id');
+        const currentWebhookUrl = document.getElementById('current-webhook-url');
+        const currentSessionStatus = document.getElementById('current-session-status');
+        const currentCreatedAt = document.getElementById('current-created-at');
+        const webhookUrlInput = document.getElementById('webhook-url');
+        const updateWebhookBtn = document.getElementById('update-webhook-btn');
+        const refreshUsersBtn = document.getElementById('refresh-users-btn');
+        const usersList = document.getElementById('users-list');
+        const webhookError = document.getElementById('webhook-error');
+        const webhookSuccess = document.getElementById('webhook-success');
+
+        function getAuthHeaders() {
+            const token = localStorage.getItem('jwtToken');
+            if (!token) {
+                alert('Please login first');
+                window.location.href = 'login.html';
+                return null;
+            }
+            return {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            };
+        }
+
+        function showError(element, message) {
+            element.textContent = message;
+            element.style.display = 'block';
+            setTimeout(() => {
+                element.style.display = 'none';
+            }, 5000);
+        }
+
+        function showSuccess(element, message) {
+            element.textContent = message;
+            element.style.display = 'block';
+            setTimeout(() => {
+                element.style.display = 'none';
+            }, 3000);
+        }
+
+        // Load current user info
+        async function loadCurrentUserInfo() {
+            const headers = getAuthHeaders();
+            if (!headers) return;
+
+            try {
+                // Get session status
+                const sessionResponse = await fetch(`${apiUrlInput.value}/api/session/status`, { headers });
+                const sessionData = await sessionResponse.json();
+                
+                if (sessionResponse.ok) {
+                    currentSessionStatus.textContent = sessionData.status || 'Unknown';
+                    currentSessionStatus.style.color = sessionData.status === 'connected' ? '#28a745' : '#dc3545';
+                }
+
+                // Get business info (which includes user config)
+                const businessResponse = await fetch(`${apiUrlInput.value}/api/business`, { headers });
+                const businessData = await businessResponse.json();
+                
+                if (businessResponse.ok) {
+                    const userConfig = businessData.data || {};
+                    currentTenantName.textContent = userConfig.name || 'No business name set';
+                    currentWebhookUrl.textContent = userConfig.webhook_url || 'Not set';
+                }
+
+            } catch (error) {
+                console.error('Error loading user info:', error);
+            }
+        }
+
+        // Update webhook URL
+        updateWebhookBtn.addEventListener('click', async () => {
+            const headers = getAuthHeaders();
+            if (!headers) return;
+
+            const webhookUrl = webhookUrlInput.value.trim();
+            if (!webhookUrl) {
+                showError(webhookError, 'Webhook URL is required');
+                return;
+            }
+
+            updateWebhookBtn.disabled = true;
+            updateWebhookBtn.textContent = 'Updating...';
+
+            try {
+                const response = await fetch(`${apiUrlInput.value}/api/business/webhook`, {
+                    method: 'PUT',
+                    headers,
+                    body: JSON.stringify({ webhook_url: webhookUrl })
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    showSuccess(webhookSuccess, 'Webhook URL updated successfully');
+                    webhookUrlInput.value = '';
+                    loadCurrentUserInfo();
+                } else {
+                    showError(webhookError, data.message || 'Failed to update webhook');
+                }
+            } catch (error) {
+                showError(webhookError, 'Network error: ' + error.message);
+            }
+
+            updateWebhookBtn.disabled = false;
+            updateWebhookBtn.textContent = 'Update Webhook';
+        });
+
+        // Load all users (admin functionality - this would require admin privileges)
+        refreshUsersBtn.addEventListener('click', async () => {
+            const headers = getAuthHeaders();
+            if (!headers) return;
+
+            refreshUsersBtn.disabled = true;
+            refreshUsersBtn.textContent = 'Loading...';
+
+            try {
+                // Note: This endpoint would need to be implemented on the backend
+                // For now, we'll just show a message
+                usersList.innerHTML = '<p>User list functionality requires backend implementation with admin privileges.</p>';
+                
+            } catch (error) {
+                usersList.innerHTML = `<p class="error">Error loading users: ${error.message}</p>`;
+            }
+
+            refreshUsersBtn.disabled = false;
+            refreshUsersBtn.textContent = 'Refresh Users List';
+        });
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', () => {
+            const token = localStorage.getItem('jwtToken');
+            const tenantId = localStorage.getItem('tenantId');
+            const savedApiUrl = localStorage.getItem('apiUrl');
+            
+            if (!token || !tenantId) {
+                alert('Please login first');
+                window.location.href = 'login.html';
+                return;
+            }
+
+            if (savedApiUrl) {
+                apiUrlInput.value = savedApiUrl;
+            }
+
+            currentTenantId.textContent = tenantId;
+            currentCreatedAt.textContent = new Date().toLocaleString();
+            
+            loadCurrentUserInfo();
+        });
+    </script>
+</body>
+</html>
