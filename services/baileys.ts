@@ -220,6 +220,16 @@ class WhatsAppService {
             status: "connected",
           });
 
+          // Attempt to refresh business info on successful connection
+          try {
+            await this.refreshBusinessInfo();
+          } catch (e) {
+            errorLogger.error({
+              msg: "Failed to refresh business info after connect",
+              error: (e as Error)?.message || e,
+            });
+          }
+
           // on reconnect, explicitly backfill message history for chats
           if (isReconnecting) {
             try {
@@ -470,10 +480,14 @@ class WhatsAppService {
                   });
                 }
 
-                // Send to webhook
+                // Send to webhook with business details
+                const businessInfo = Store.getBusinessInfo();
                 await WhatsAppService.notifyWebhook(
                   "message.received",
-                  messageInfo
+                  {
+                    message: messageInfo,
+                    business: businessInfo
+                  }
                 );
                 logger.info({
                   msg: "New message processed",
@@ -662,6 +676,127 @@ class WhatsAppService {
       isConnected: this.isConnected,
       qr: this.qr,
     };
+  }
+
+  /**
+   * Attempt to fetch business info from Baileys/WhatsApp if available and persist it.
+   * Falls back gracefully if running on a non-business account or API not available.
+   */
+  async refreshBusinessInfo(): Promise<{
+    stored: ReturnType<typeof Store.getBusinessInfo>;
+    fetched: any | null;
+    persisted: boolean;
+    reason?: string;
+  }> {
+    try {
+      // read existing
+      const existing = Store.getBusinessInfo();
+
+      if (!this.sock || !this.isConnected) {
+        // no active connection, just return what we have
+        return { stored: existing, fetched: null, persisted: false, reason: 'not_connected' };
+      }
+
+      // Try to determine self JID and name
+      const meJid: string | null =
+        (this.sock.user && (this.sock.user.id || this.sock.user.jid)) ||
+        (this.sock.authState && this.sock.authState.creds && this.sock.authState.creds.me && (this.sock.authState.creds.me.id || this.sock.authState.creds.me.jid)) ||
+        null;
+
+      const meName: string | null =
+        (this.sock.user && (this.sock.user.name || this.sock.user.pushName)) ||
+        (this.sock.authState && this.sock.authState.creds && this.sock.authState.creds.me && (this.sock.authState.creds.me.name || this.sock.authState.creds.me.pushName)) ||
+        null;
+
+      let fetchedProfile: any | null = null;
+
+      // Baileys business profile API (some versions support getBusinessProfile)
+      try {
+        if (typeof this.sock.getBusinessProfile === 'function' && meJid) {
+          fetchedProfile = await this.sock.getBusinessProfile(meJid);
+        }
+      } catch (e) {
+        // ignore if not available
+        errorLogger.error({
+          msg: 'getBusinessProfile failed',
+          error: (e as Error)?.message || e,
+        });
+      }
+
+      // Also try to fetch "about" / status text if available (not strictly business)
+      let about: string | null = null;
+      try {
+        if (typeof this.sock.fetchStatus === 'function' && meJid) {
+          const s = await this.sock.fetchStatus(meJid);
+          about = s?.status || null;
+        }
+      } catch {
+        // ignore
+      }
+
+      // Map fields we care about
+      // Many of these may not be available; map best-effort from fetchedProfile
+      const mapped = {
+        name: meName || fetchedProfile?.title || fetchedProfile?.businessName || existing.name || null,
+        working_hours: fetchedProfile?.businessHours
+          ? JSON.stringify(fetchedProfile.businessHours)
+          : existing.working_hours || null,
+        location_url: fetchedProfile?.address
+          ? null
+          : existing.location_url || null, // no direct URL; could be composed externally
+        shipping_details: existing.shipping_details || null, // not available via WA — keep existing
+        instagram_url: Array.isArray(fetchedProfile?.connectedAccounts)
+          ? (fetchedProfile.connectedAccounts.find((a: any) => a?.type?.toLowerCase?.() === 'instagram')?.value || existing.instagram_url || null)
+          : existing.instagram_url || null,
+        website_url: (() => {
+          // Some versions expose websites array
+          const websites = fetchedProfile?.websites || fetchedProfile?.website || [];
+          if (Array.isArray(websites) && websites.length) return websites[0];
+          if (typeof websites === 'string' && websites) return websites;
+          return existing.website_url || null;
+        })(),
+        mobile_numbers: (() => {
+          // We know our own number; we can add it if derivable from JID
+          const nums = Array.isArray(existing.mobile_numbers) ? [...existing.mobile_numbers] : [];
+          if (meJid && meJid.includes('@')) {
+            const base = (meJid ?? '').split('@')[0];
+            const digits = (base || '').replace(/[^\d]/g, '');
+            if (digits && !nums.includes(digits)) nums.push(digits);
+          }
+          return nums.length ? nums : existing.mobile_numbers || null;
+        })(),
+      };
+
+      // If we fetched nothing meaningful, still persist name/about improvements if any
+      Store.setBusinessInfo({
+        name: mapped.name,
+        working_hours: mapped.working_hours,
+        location_url: mapped.location_url,
+        shipping_details: mapped.shipping_details,
+        instagram_url: mapped.instagram_url,
+        website_url: mapped.website_url,
+        mobile_numbers: mapped.mobile_numbers ?? null,
+      });
+
+      const updated = Store.getBusinessInfo();
+
+      return {
+        stored: updated,
+        fetched: fetchedProfile ? { ...fetchedProfile, about } : null,
+        persisted: true,
+      };
+    } catch (e) {
+      errorLogger.error({
+        msg: 'refreshBusinessInfo failed',
+        error: (e as Error)?.message || e,
+      });
+      return {
+        stored: Store.getBusinessInfo(),
+        fetched: null,
+        persisted: false,
+        reason: 'exception',
+      };
+    }
   }
 
   async getConversations(options: any = {}): Promise<any[]> {

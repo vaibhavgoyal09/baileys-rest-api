@@ -11,6 +11,7 @@ import responseHandler from './middlewares/responseHandler.js';
 // Routes
 import sessionRoutes from './routes/session.js';
 import messageRoutes from './routes/message.js';
+import businessRoutes from './routes/business.js';
 
  // Services
 import WhatsAppService from './services/baileys.js';
@@ -47,9 +48,41 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
- // Routes
+// Request and response logging middleware
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const start = Date.now();
+  
+  // Log incoming request
+  console.log('Incoming request', {
+    method: req.method,
+    url: req.url,
+    headers: {
+      ...req.headers,
+      authorization: req.headers.authorization ? '***' : undefined,
+      'x-access-token': req.headers['x-access-token'] ? '***' : undefined
+    },
+    body: req.body,
+    ip: req.ip || req.connection.remoteAddress
+  });
+
+  // Hook into response finish to log response
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    console.log('Response sent', {
+      statusCode: res.statusCode,
+      statusMessage: res.statusMessage,
+      duration: `${duration}ms`,
+      headers: res.getHeaders()
+    });
+  });
+
+  next();
+});
+
+// Routes
 app.use('/api/session', sessionRoutes);
 app.use('/api/message', messageRoutes);
+app.use('/api/business', businessRoutes);
 
 // Health/Readiness and Metrics
 app.get('/health', async (req: Request, res: Response): Promise<void> => {

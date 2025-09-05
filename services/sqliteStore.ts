@@ -82,9 +82,29 @@ class SQLiteStore {
         FOREIGN KEY (jid) REFERENCES chats(jid)
       );
 
+      -- Single-row table to store business profile/info
+      CREATE TABLE IF NOT EXISTS business_info (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        name TEXT,
+        working_hours TEXT,
+        location_url TEXT,
+        shipping_details TEXT,
+        instagram_url TEXT,
+        website_url TEXT,
+        mobile_numbers TEXT, -- JSON array string
+        last_updated INTEGER
+      );
+
       CREATE INDEX IF NOT EXISTS idx_chats_last_ts ON chats(lastMessageTimestamp DESC);
       CREATE INDEX IF NOT EXISTS idx_messages_jid_ts ON messages(jid, timestamp DESC);
     `);
+
+    // Ensure a single row exists for business_info
+    try {
+      this.db.prepare(`INSERT OR IGNORE INTO business_info (id, last_updated) VALUES (1, strftime('%s','now'))`).run();
+    } catch (e) {
+      errorLogger.error({ msg: 'SQLite ensure business_info row failed', error: (e as Error).message });
+    }
   }
 
   prepareStatements(): void {
@@ -372,6 +392,111 @@ class SQLiteStore {
         resolve(false);
       }
     });
+  }
+
+  // Business Info: getters and setters
+
+  getBusinessInfo(): {
+    name: string | null;
+    working_hours: string | null;
+    location_url: string | null;
+    shipping_details: string | null;
+    instagram_url: string | null;
+    website_url: string | null;
+    mobile_numbers: string[] | null;
+    last_updated: number | null;
+  } {
+    try {
+      const row = this.db.prepare(`
+        SELECT name, working_hours, location_url, shipping_details, instagram_url, website_url, mobile_numbers, last_updated
+        FROM business_info
+        WHERE id = 1
+      `).get() as any;
+
+      if (!row) {
+        return {
+          name: null,
+          working_hours: null,
+          location_url: null,
+          shipping_details: null,
+          instagram_url: null,
+          website_url: null,
+          mobile_numbers: null,
+          last_updated: null,
+        };
+      }
+
+      return {
+        name: row.name ?? null,
+        working_hours: row.working_hours ?? null,
+        location_url: row.location_url ?? null,
+        shipping_details: row.shipping_details ?? null,
+        instagram_url: row.instagram_url ?? null,
+        website_url: row.website_url ?? null,
+        mobile_numbers: row.mobile_numbers ? JSON.parse(row.mobile_numbers) : null,
+        last_updated: row.last_updated ? Number(row.last_updated) : null,
+      };
+    } catch (e) {
+      errorLogger.error({ msg: 'SQLite getBusinessInfo failed', error: (e as Error).message });
+      return {
+        name: null,
+        working_hours: null,
+        location_url: null,
+        shipping_details: null,
+        instagram_url: null,
+        website_url: null,
+        mobile_numbers: null,
+        last_updated: null,
+      };
+    }
+  }
+
+  setBusinessInfo(info: {
+    name?: string | null;
+    working_hours?: string | null;
+    location_url?: string | null;
+    shipping_details?: string | null;
+    instagram_url?: string | null;
+    website_url?: string | null;
+    mobile_numbers?: string[] | null;
+  }): void {
+    try {
+      const current = this.getBusinessInfo();
+
+      const merged = {
+        name: info.name !== undefined ? info.name : current.name,
+        working_hours: info.working_hours !== undefined ? info.working_hours : current.working_hours,
+        location_url: info.location_url !== undefined ? info.location_url : current.location_url,
+        shipping_details: info.shipping_details !== undefined ? info.shipping_details : current.shipping_details,
+        instagram_url: info.instagram_url !== undefined ? info.instagram_url : current.instagram_url,
+        website_url: info.website_url !== undefined ? info.website_url : current.website_url,
+        mobile_numbers: info.mobile_numbers !== undefined ? info.mobile_numbers : current.mobile_numbers,
+      };
+
+      this.db.prepare(`
+        INSERT INTO business_info (id, name, working_hours, location_url, shipping_details, instagram_url, website_url, mobile_numbers, last_updated)
+        VALUES (1, @name, @working_hours, @location_url, @shipping_details, @instagram_url, @website_url, @mobile_numbers, strftime('%s','now'))
+        ON CONFLICT(id) DO UPDATE SET
+          name = excluded.name,
+          working_hours = excluded.working_hours,
+          location_url = excluded.location_url,
+          shipping_details = excluded.shipping_details,
+          instagram_url = excluded.instagram_url,
+          website_url = excluded.website_url,
+          mobile_numbers = excluded.mobile_numbers,
+          last_updated = excluded.last_updated
+      `).run({
+        name: merged.name ?? null,
+        working_hours: merged.working_hours ?? null,
+        location_url: merged.location_url ?? null,
+        shipping_details: merged.shipping_details ?? null,
+        instagram_url: merged.instagram_url ?? null,
+        website_url: merged.website_url ?? null,
+        mobile_numbers: merged.mobile_numbers ? JSON.stringify(merged.mobile_numbers) : null,
+      });
+    } catch (e) {
+      errorLogger.error({ msg: 'SQLite setBusinessInfo failed', error: (e as Error).message });
+    }
   }
 }
 

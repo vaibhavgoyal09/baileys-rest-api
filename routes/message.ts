@@ -40,17 +40,18 @@ router.get('/conversations', verifyToken, async (req: Request, res: Response): P
   }
 });
 
-router.get('/messages/:jid', verifyToken, async (req: Request, res: Response): Promise<void> => {
+router.get('/messages', verifyToken, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { jid } = req.params;
+    const { jid } = req.query;
     if (!jid) {
       (res as any).sendError(400, 'JID is required');
       return;
     }
     const options = req.query;
-    const messages = await WhatsAppService.getMessages(jid, options);
+    const messages = await WhatsAppService.getMessages(jid as string, options);
     (res as any).sendResponse(200, messages);
   } catch (error) {
+    console.log("Messages Not Found", error);
     (res as any).sendError(500, error);
   }
 });

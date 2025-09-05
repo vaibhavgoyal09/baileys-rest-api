@@ -19,11 +19,59 @@
         .container {
             background-color: white;
             padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-radius: 12px;
+            box-shadow: 0 8px 28px rgba(0,0,0,0.12);
+            border: 1px solid #eaeaea;
         }
         .form-group {
             margin-bottom: 15px;
+        }
+        .section {
+            border: 1px solid #eef0f3;
+            padding: 16px;
+            border-radius: 10px;
+            margin: 18px 0;
+            background: linear-gradient(180deg, #ffffff 0%, #fafbfc 100%);
+        }
+        .section h2 {
+            margin-top: 0;
+            font-size: 20px;
+            color: #1f2d3d;
+        }
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+        }
+        .muted {
+            color: #6b7280;
+            font-size: 12px;
+        }
+        .btn-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 8px;
+        }
+        .pill {
+            border-radius: 9999px;
+        }
+        .card {
+            background: #ffffff;
+            border: 1px solid #eef0f3;
+            border-radius: 8px;
+            padding: 12px;
+        }
+        .info-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            background: #eef6ff;
+            color: #0b5ed7;
+            font-size: 12px;
+            border: 1px solid #d6e8ff;
         }
         label {
             display: block;
@@ -93,6 +141,59 @@
         <button id="status-btn">Check Status</button>
         <button id="logout-btn">Logout</button>
 
+        <div class="section">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+              <h2 style="margin:0;display:flex;align-items:center;gap:8px;">
+                Business Profile
+                <span class="info-badge">Manage your public info</span>
+              </h2>
+              <div class="btn-row">
+                <button id="business-load-btn" class="pill" title="Load saved business info">Load</button>
+                <button id="business-refresh-btn" class="pill" title="Auto-fetch from WhatsApp (if available)">Auto-Fetch</button>
+                <button id="business-save-btn" class="pill" title="Save changes">Save</button>
+              </div>
+            </div>
+
+            <div class="grid-2" style="margin-top:12px;">
+              <div class="form-group">
+                <label for="biz-name">Business Name</label>
+                <input id="biz-name" type="text" placeholder="Your business name">
+              </div>
+              <div class="form-group">
+                <label for="biz-website">Website URL</label>
+                <input id="biz-website" type="url" placeholder="https://example.com">
+              </div>
+              <div class="form-group">
+                <label for="biz-instagram">Instagram Profile URL</label>
+                <input id="biz-instagram" type="url" placeholder="https://instagram.com/yourhandle">
+              </div>
+              <div class="form-group">
+                <label for="biz-location">Location URL</label>
+                <input id="biz-location" type="url" placeholder="Google Maps URL">
+              </div>
+            </div>
+
+            <div class="grid-2">
+              <div class="form-group">
+                <label for="biz-working-hours">Working Hours</label>
+                <textarea id="biz-working-hours" rows="3" placeholder="Mon-Fri 9:00 AM - 6:00 PM"></textarea>
+                <div class="muted">You can also paste JSON for structured hours.</div>
+              </div>
+              <div class="form-group">
+                <label for="biz-shipping">Shipping Details</label>
+                <textarea id="biz-shipping" rows="3" placeholder="Free shipping over $50. Delivery within 3-5 days."></textarea>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="biz-mobiles">Mobile Numbers</label>
+              <input id="biz-mobiles" type="text" placeholder="+919999999999, +14155552671">
+              <div class="muted">Comma-separated. Digits with optional + prefix.</div>
+            </div>
+
+            <div id="business-status" class="card" style="display:none;"></div>
+        </div>
+
         <h2>Send Messages</h2>
         <div class="form-group">
             <label for="phone-number">Phone Number:</label>
@@ -133,6 +234,20 @@
         const fetchMessagesBtn = document.getElementById('fetch-messages-btn');
         const responseContainer = document.getElementById('response-container');
 
+        // Business Info Elements
+        const businessLoadBtn = document.getElementById('business-load-btn');
+        const businessSaveBtn = document.getElementById('business-save-btn');
+        const businessRefreshBtn = document.getElementById('business-refresh-btn');
+
+        const bizName = document.getElementById('biz-name');
+        const bizWebsite = document.getElementById('biz-website');
+        const bizInstagram = document.getElementById('biz-instagram');
+        const bizLocation = document.getElementById('biz-location');
+        const bizWorkingHours = document.getElementById('biz-working-hours');
+        const bizShipping = document.getElementById('biz-shipping');
+        const bizMobiles = document.getElementById('biz-mobiles');
+        const businessStatus = document.getElementById('business-status');
+
         function getAuthHeaders() {
             const token = accessTokenInput.value;
             if (!token) {
@@ -170,6 +285,25 @@
             responseContainer.appendChild(responseDiv);
         }
 
+        function showBusinessStatus(msg, isError = false) {
+            businessStatus.style.display = 'block';
+            businessStatus.style.borderColor = isError ? '#f5c6cb' : '#c3e6cb';
+            businessStatus.style.background = isError ? '#f8d7da' : '#d4edda';
+            businessStatus.style.color = isError ? '#721c24' : '#155724';
+            businessStatus.textContent = (typeof msg === 'string') ? msg : JSON.stringify(msg, null, 2);
+        }
+
+        function toArray(text) {
+            if (!text) return null;
+            const parts = String(text).split(',').map(s => s.trim()).filter(Boolean);
+            return parts.length ? parts : null;
+        }
+
+        function fromArray(arr) {
+            if (!arr) return '';
+            try { return (arr || []).join(', '); } catch { return ''; }
+        }
+
         startBtn.addEventListener('click', async () => {
             const headers = getAuthHeaders();
             if (!headers) return;
@@ -195,6 +329,100 @@
 
             startBtn.disabled = false;
             startBtn.textContent = 'Start Session';
+        });
+
+        // Business: Load current info
+        businessLoadBtn.addEventListener('click', async () => {
+            const headers = getAuthHeaders();
+            if (!headers) return;
+
+            businessLoadBtn.disabled = true;
+            try {
+                const response = await fetch(`${apiUrlInput.value}/api/business`, { headers });
+                const data = await response.json();
+                if (!response.ok) {
+                    showBusinessStatus(data, true);
+                } else {
+                    const info = data?.data || {};
+                    bizName.value = info.name || '';
+                    bizWebsite.value = info.website_url || '';
+                    bizInstagram.value = info.instagram_url || '';
+                    bizLocation.value = info.location_url || '';
+                    bizWorkingHours.value = info.working_hours || '';
+                    bizShipping.value = info.shipping_details || '';
+                    bizMobiles.value = fromArray(info.mobile_numbers);
+                    showBusinessStatus('Loaded business info.');
+                }
+            } catch (e) {
+                showBusinessStatus('Network error: ' + e.message, true);
+            }
+            businessLoadBtn.disabled = false;
+        });
+
+        // Business: Save
+        businessSaveBtn.addEventListener('click', async () => {
+            const headers = getAuthHeaders();
+            if (!headers) return;
+
+            businessSaveBtn.disabled = true;
+            try {
+                const payload = {
+                    name: bizName.value || null,
+                    working_hours: bizWorkingHours.value || null,
+                    location_url: bizLocation.value || null,
+                    shipping_details: bizShipping.value || null,
+                    instagram_url: bizInstagram.value || null,
+                    website_url: bizWebsite.value || null,
+                    mobile_numbers: toArray(bizMobiles.value),
+                };
+                const response = await fetch(`${apiUrlInput.value}/api/business`, {
+                    method: 'PUT',
+                    headers,
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    showBusinessStatus(data, true);
+                } else {
+                    showBusinessStatus('Business info saved successfully.');
+                }
+            } catch (e) {
+                showBusinessStatus('Network error: ' + e.message, true);
+            }
+            businessSaveBtn.disabled = false;
+        });
+
+        // Business: Auto-Fetch from WhatsApp
+        businessRefreshBtn.addEventListener('click', async () => {
+            const headers = getAuthHeaders();
+            if (!headers) return;
+
+            businessRefreshBtn.disabled = true;
+            businessRefreshBtn.textContent = 'Fetching...';
+            try {
+                const response = await fetch(`${apiUrlInput.value}/api/business/refresh`, {
+                    method: 'POST',
+                    headers
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    showBusinessStatus(data, true);
+                } else {
+                    const info = data?.stored || {};
+                    bizName.value = info.name || '';
+                    bizWebsite.value = info.website_url || '';
+                    bizInstagram.value = info.instagram_url || '';
+                    bizLocation.value = info.location_url || '';
+                    bizWorkingHours.value = info.working_hours || '';
+                    bizShipping.value = info.shipping_details || '';
+                    bizMobiles.value = fromArray(info.mobile_numbers);
+                    showBusinessStatus('Fetched and updated from WhatsApp (where available).');
+                }
+            } catch (e) {
+                showBusinessStatus('Network error: ' + e.message, true);
+            }
+            businessRefreshBtn.disabled = false;
+            businessRefreshBtn.textContent = 'Auto-Fetch';
         });
 
         statusBtn.addEventListener('click', async () => {
@@ -364,7 +592,7 @@
             fetchMessagesBtn.textContent = 'Fetching...';
 
             try {
-                const response = await fetch(`${apiUrlInput.value}/api/message/messages/${encodeURIComponent(jid)}`, {
+                const response = await fetch(`${apiUrlInput.value}/api/message/messages?jid=${encodeURIComponent(jid)}`, {
                     headers: headers
                 });
 
