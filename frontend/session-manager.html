@@ -1,293 +1,551 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Baileys Session Manager</title>
-    <style>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+        <style>
+      :root {
+        --primary: #3b82f6;
+        --primary-dark: #2563eb;
+        --secondary: #60a5fa;
+        --dark: #0f172a;
+        --dark-secondary: #1e293b;
+        --dark-tertiary: #334155;
+        --light: #f9fafb;
+        --gray-100: #f3f4f6;
+        --gray-200: #e5e7eb;
+        --gray-300: #d1d5db;
+        --gray-400: #9ca3af;
+        --gray-500: #6b7280;
+        --gray-600: #475569;
+        --gray-700: #374151;
+        --gray-800: #1f2937;
+        --success: #10b981;
+        --error: #ef4444;
+        --warning: #f59e0b;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        font-family: "Inter", sans-serif;
+      }
+
       body {
-        font-family: Arial, sans-serif;
-        max-width: 800px;
-        margin: 0 auto;
-        padding: 20px;
-        background-color: #f5f5f5;
+        background-color: var(--dark);
+        color: var(--light);
+        min-height: 100vh;
+        padding: 2rem;
       }
-      h1 {
-        color: #333;
-        text-align: center;
-      }
+
       .container {
-        background-color: white;
-        padding: 20px;
-        border-radius: 12px;
-        box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);
-        border: 1px solid #eaeaea;
+        max-width: 1000px;
+        margin: 0 auto;
+        background-color: var(--dark-secondary);
+        border-radius: 16px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        overflow: hidden;
+        border: 1px solid var(--gray-600);
       }
+
+      header {
+        padding: 1.5rem 2rem;
+        text-align: center;
+        background-color: var(--dark);
+        border-bottom: 1px solid var(--gray-600);
+      }
+
+      h1 {
+        color: var(--light);
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+      }
+
+      .content {
+        padding: 2rem;
+      }
+
       .form-group {
-        margin-bottom: 15px;
+        margin-bottom: 1.5rem;
       }
-      .section {
-        border: 1px solid #eef0f3;
-        padding: 16px;
-        border-radius: 10px;
-        margin: 18px 0;
-        background: linear-gradient(180deg, #ffffff 0%, #fafbfc 100%);
+
+      label {
+        display: block;
+        margin-bottom: 0.5rem;
+        font-weight: 500;
+        color: var(--light);
       }
-      .section h2 {
-        margin-top: 0;
-        font-size: 20px;
-        color: #1f2d3d;
+
+      input[type="text"],
+      input[type="url"],
+      textarea,
+      select {
+        width: 100%;
+        padding: 0.75rem;
+        border: 1px solid var(--gray-600);
+        border-radius: 8px;
+        background-color: var(--dark-tertiary);
+        color: var(--light);
+        font-size: 0.95rem;
+        transition: all 0.2s ease;
       }
+
+      input[type="text"]:focus,
+      input[type="url"]:focus,
+      textarea:focus,
+      select:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+      }
+
+      input[type="text"]::placeholder,
+      input[type="url"]::placeholder,
+      textarea::placeholder {
+        color: var(--gray-400);
+      }
+
       .grid-2 {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 14px;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
       }
-      .muted {
-        color: #6b7280;
-        font-size: 12px;
-      }
+
       .btn-row {
         display: flex;
-        gap: 10px;
+        gap: 0.75rem;
         flex-wrap: wrap;
-        margin-top: 8px;
+        margin-bottom: 1.5rem;
       }
-      .pill {
-        border-radius: 9999px;
-      }
-      .card {
-        background: #ffffff;
-        border: 1px solid #eef0f3;
+
+      button {
+        padding: 0.75rem 1.25rem;
+        border: none;
         border-radius: 8px;
-        padding: 12px;
+        cursor: pointer;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        font-size: 0.95rem;
       }
+
+      .btn-primary {
+        background-color: var(--primary);
+        color: white;
+      }
+
+      .btn-primary:hover {
+        background-color: var(--primary-dark);
+      }
+
+      .btn-secondary {
+        background-color: var(--gray-600);
+        color: var(--light);
+      }
+
+      .btn-secondary:hover {
+        background-color: var(--gray-500);
+      }
+
+      .btn-danger {
+        background-color: var(--error);
+        color: white;
+      }
+
+      .btn-danger:hover {
+        background-color: #dc2626;
+      }
+
+      .btn-warning {
+        background-color: var(--warning);
+        color: white;
+      }
+
+      .btn-warning:hover {
+        background-color: #d97706;
+      }
+
+      .btn-disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+
+      .section {
+        margin-bottom: 2rem;
+        border-radius: 12px;
+        background-color: var(--dark-tertiary);
+        padding: 1.5rem;
+        border: 1px solid var(--gray-600);
+      }
+
+      .section h2 {
+        color: var(--light);
+        font-size: 1.25rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid var(--gray-600);
+      }
+
+      .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid var(--gray-600);
+      }
+
+      .section-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: var(--light);
+      }
+
       .info-badge {
         display: inline-flex;
         align-items: center;
-        gap: 6px;
-        padding: 4px 10px;
-        border-radius: 999px;
-        background: #eef6ff;
-        color: #0b5ed7;
-        font-size: 12px;
-        border: 1px solid #d6e8ff;
+        gap: 0.5rem;
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        background: rgba(59, 130, 246, 0.1);
+        color: var(--primary);
+        font-size: 0.75rem;
+        border: 1px solid rgba(59, 130, 246, 0.2);
       }
-      label {
-        display: block;
-        margin-bottom: 5px;
-        font-weight: bold;
+
+      .action-buttons {
+        display: flex;
+        gap: 0.75rem;
       }
-      input,
-      textarea {
-        width: 100%;
-        padding: 8px;
-        border: 1px solid #ddd;
-        border-radius: 4px;
+
+      .action-button {
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        font-size: 0.875rem;
+        transition: all 0.2s ease;
       }
-      button {
-        padding: 10px 20px;
-        background-color: #007bff;
+
+      .action-button-primary {
+        background-color: var(--primary);
         color: white;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-        margin-right: 10px;
       }
-      button:hover {
-        background-color: #0056b3;
+
+      .action-button-primary:hover {
+        background-color: var(--primary-dark);
       }
-      button:disabled {
-        background-color: #ccc;
-        cursor: not-allowed;
+
+      .action-button-secondary {
+        background-color: var(--gray-600);
+        color: var(--light);
       }
+
+      .action-button-secondary:hover {
+        background-color: var(--gray-500);
+      }
+
+      .muted {
+        color: var(--gray-400);
+        font-size: 0.875rem;
+        margin-top: 0.5rem;
+      }
+
       .response {
-        margin-top: 20px;
-        padding: 15px;
-        border-radius: 4px;
+        margin-top: 1.5rem;
+        padding: 1rem;
+        border-radius: 8px;
         white-space: pre-wrap;
+        font-family: monospace;
+        font-size: 0.9rem;
       }
+
       .success {
-        background-color: #d4edda;
-        border: 1px solid #c3e6cb;
-        color: #155724;
+        background-color: rgba(16, 185, 129, 0.1);
+        border: 1px solid rgba(16, 185, 129, 0.2);
+        color: var(--success);
       }
+
       .error {
-        background-color: #f8d7da;
-        border: 1px solid #f5c6cb;
-        color: #721c24;
+        background-color: rgba(239, 68, 68, 0.1);
+        border: 1px solid rgba(239, 68, 68, 0.2);
+        color: var(--error);
       }
+
       .qr-container {
         text-align: center;
-        margin-top: 20px;
+        margin-top: 1rem;
       }
+
       #qr-code {
         max-width: 200px;
         margin: 0 auto;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      }
+
+      .input-group {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .input-group label {
+        margin-bottom: 0.5rem;
+      }
+
+      .input-group input,
+      .input-group textarea {
+        margin-bottom: 0.5rem;
+      }
+
+      .highlighted-text {
+        background-color: rgba(59, 130, 246, 0.1);
+        padding: 0.25rem;
+        border-radius: 4px;
+      }
+
+      /* Dark themed current tenant display */
+      #current-tenant {
+        padding: 0.75rem !important;
+        background-color: var(--dark-tertiary) !important;
+        border-radius: 8px !important;
+        border: 1px solid var(--gray-600) !important;
+        color: var(--light) !important;
+      }
+
+      /* Dark themed business status */
+      #business-status {
+        background-color: var(--dark-tertiary) !important;
+        border: 1px solid var(--gray-600) !important;
+        color: var(--light) !important;
+      }
+
+      #business-status.success {
+        background-color: rgba(16, 185, 129, 0.1) !important;
+        border: 1px solid rgba(16, 185, 129, 0.2) !important;
+        color: var(--success) !important;
+      }
+
+      #business-status.error {
+        background-color: rgba(239, 68, 68, 0.1) !important;
+        border: 1px solid rgba(239, 68, 68, 0.2) !important;
+        color: var(--error) !important;
+      }
+
+      @media (max-width: 768px) {
+        .grid-2 {
+          grid-template-columns: 1fr;
+        }
+
+        .btn-row {
+          flex-direction: column;
+        }
+
+        .action-buttons {
+          flex-direction: column;
+        }
+
+        .section {
+          padding: 1rem;
+        }
       }
     </style>
   </head>
   <body>
-    <h1>Baileys Session Manager</h1>
     <div class="container">
-      <div class="form-group">
-        <label for="api-url">API Server URL:</label>
-        <input type="text" id="api-url" value="http://localhost:3001" />
-      </div>
-      <div class="form-group">
-        <label>Current Tenant:</label>
-        <div
-          id="current-tenant"
-          style="
-            padding: 8px;
-            background-color: #eef6ff;
-            border-radius: 4px;
-            border: 1px solid #d6e8ff;
-          "
-        ></div>
-      </div>
-      <div class="btn-row" style="margin-bottom: 20px">
-        <button id="start-btn">Start Session</button>
-        <button id="status-btn">Check Status</button>
-        <button id="logout-btn">Logout</button>
-        <button id="user-management-btn" style="background-color: #6c757d">
-          User Management
-        </button>
-      </div>
+      <header>
+        <h1>Baileys Session Manager</h1>
+      </header>
 
-      <div class="section">
-        <div
-          style="
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 8px;
-          "
-        >
-          <h2 style="margin: 0; display: flex; align-items: center; gap: 8px">
-            Business Profile
-            <span class="info-badge">Manage your public info</span>
-          </h2>
-          <div class="btn-row">
-            <button
-              id="business-load-btn"
-              class="pill"
-              title="Load saved business info"
-            >
-              Load
-            </button>
-            <button
-              id="business-refresh-btn"
-              class="pill"
-              title="Auto-fetch from WhatsApp (if available)"
-            >
-              Auto-Fetch
-            </button>
-            <button id="business-save-btn" class="pill" title="Save changes">
-              Save
-            </button>
-          </div>
-        </div>
-
-        <div class="grid-2" style="margin-top: 12px">
-          <div class="form-group">
-            <label for="biz-name">Business Name</label>
-            <input id="biz-name" type="text" placeholder="Your business name" />
-          </div>
-          <div class="form-group">
-            <label for="biz-website">Website URL</label>
-            <input
-              id="biz-website"
-              type="url"
-              placeholder="https://example.com"
-            />
-          </div>
-          <div class="form-group">
-            <label for="biz-instagram">Instagram Profile URL</label>
-            <input
-              id="biz-instagram"
-              type="url"
-              placeholder="https://instagram.com/yourhandle"
-            />
-          </div>
-          <div class="form-group">
-            <label for="biz-location">Location URL</label>
-            <input id="biz-location" type="url" placeholder="Google Maps URL" />
-          </div>
-        </div>
-
-        <div class="grid-2">
-          <div class="form-group">
-            <label for="biz-working-hours">Working Hours</label>
-            <textarea
-              id="biz-working-hours"
-              rows="3"
-              placeholder="Mon-Fri 9:00 AM - 6:00 PM"
-            ></textarea>
-            <div class="muted">
-              You can also paste JSON for structured hours.
-            </div>
-          </div>
-          <div class="form-group">
-            <label for="biz-shipping">Shipping Details</label>
-            <textarea
-              id="biz-shipping"
-              rows="3"
-              placeholder="Free shipping over $50. Delivery within 3-5 days."
-            ></textarea>
-          </div>
+      <div class="content">
+        <div class="form-group">
+          <label for="api-url">API Server URL:</label>
+          <input type="text" id="api-url" value="http://localhost:3001" />
         </div>
 
         <div class="form-group">
-          <label for="biz-mobiles">Mobile Numbers</label>
-          <input
-            id="biz-mobiles"
-            type="text"
-            placeholder="+919999999999, +14155552671"
-          />
-          <div class="muted">
-            Comma-separated. Digits with optional + prefix.
+          <label>Current Tenant:</label>
+          <div
+            id="current-tenant"
+            style="
+              padding: 0.75rem;
+              background-color: var(--gray-200);
+              border-radius: 8px;
+              border: 1px solid var(--gray-300);
+            "
+          ></div>
+        </div>
+
+        <div class="btn-row">
+          <button id="start-btn" class="btn-primary">Start Session</button>
+          <button id="status-btn" class="btn-primary">Check Status</button>
+          <button id="logout-btn" class="btn-danger">Logout</button>
+          <button id="user-management-btn" class="btn-secondary">
+            User Management
+          </button>
+        </div>
+
+        <div class="section">
+          <div class="section-header">
+            <div class="section-title">Business Profile</div>
+            <div class="action-buttons">
+              <button
+                id="business-load-btn"
+                class="action-button action-button-primary"
+              >
+                Load
+              </button>
+              <button
+                id="business-refresh-btn"
+                class="action-button action-button-primary"
+              >
+                Auto-Fetch
+              </button>
+              <button
+                id="business-save-btn"
+                class="action-button action-button-primary"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+
+          <div class="grid-2">
+            <div class="input-group">
+              <label for="biz-name">Business Name</label>
+              <input
+                id="biz-name"
+                type="text"
+                placeholder="Your business name"
+              />
+            </div>
+
+            <div class="input-group">
+              <label for="biz-website">Website URL</label>
+              <input
+                id="biz-website"
+                type="url"
+                placeholder="https://example.com"
+              />
+            </div>
+
+            <div class="input-group">
+              <label for="biz-instagram">Instagram Profile URL</label>
+              <input
+                id="biz-instagram"
+                type="url"
+                placeholder="https://instagram.com/yourhandle"
+              />
+            </div>
+
+            <div class="input-group">
+              <label for="biz-location">Location URL</label>
+              <input
+                id="biz-location"
+                type="url"
+                placeholder="Google Maps URL"
+              />
+            </div>
+          </div>
+
+          <div class="grid-2">
+            <div class="input-group">
+              <label for="biz-working-hours">Working Hours</label>
+              <textarea
+                id="biz-working-hours"
+                rows="3"
+                placeholder="Mon-Fri 9:00 AM - 6:00 PM"
+              ></textarea>
+              <div class="muted">
+                You can also paste JSON for structured hours.
+              </div>
+            </div>
+
+            <div class="input-group">
+              <label for="biz-shipping">Shipping Details</label>
+              <textarea
+                id="biz-shipping"
+                rows="3"
+                placeholder="Free shipping over $50. Delivery within 3-5 days."
+              ></textarea>
+            </div>
+          </div>
+
+          <div class="input-group">
+            <label for="biz-mobiles">Mobile Numbers</label>
+            <input
+              id="biz-mobiles"
+              type="text"
+              placeholder="+919999999999, +14155552671"
+            />
+            <div class="muted">
+              Comma-separated. Digits with optional + prefix.
+            </div>
+          </div>
+
+          <div
+            id="business-status"
+            class="response"
+            style="display: none"
+          ></div>
+        </div>
+
+        <div class="section">
+          <h2>Send Messages</h2>
+          <div class="input-group">
+            <label for="phone-number">Phone Number:</label>
+            <input
+              type="text"
+              id="phone-number"
+              placeholder="e.g. 1234567890 or 1234567890@whatsapp.net"
+            />
+          </div>
+
+          <div class="input-group">
+            <label for="message-text">Message:</label>
+            <textarea
+              id="message-text"
+              rows="3"
+              placeholder="Enter your message"
+            ></textarea>
+          </div>
+
+          <div class="btn-row">
+            <button id="check-num-btn" class="btn-primary">Check Number</button>
+            <button id="send-msg-btn" class="btn-primary">Send Message</button>
           </div>
         </div>
 
-        <div id="business-status" class="card" style="display: none"></div>
-      </div>
+        <div class="section">
+          <h2>Conversations</h2>
+          <button id="fetch-conversations-btn" class="btn-primary">
+            Fetch All Conversations
+          </button>
+        </div>
 
-      <h2>Send Messages</h2>
-      <div class="form-group">
-        <label for="phone-number">Phone Number:</label>
-        <input
-          type="text"
-          id="phone-number"
-          placeholder="e.g. 1234567890 or 1234567890@whatsapp.net"
-        />
-      </div>
-      <div class="form-group">
-        <label for="message-text">Message:</label>
-        <textarea
-          id="message-text"
-          rows="3"
-          placeholder="Enter your message"
-        ></textarea>
-      </div>
-      <button id="check-num-btn">Check Number</button>
-      <button id="send-msg-btn">Send Message</button>
+        <div class="section">
+          <h2>Messages</h2>
+          <div class="input-group">
+            <label for="conversation-jid">Conversation JID:</label>
+            <input
+              type="text"
+              id="conversation-jid"
+              placeholder="e.g. 1234567890@s.whatsapp.net"
+            />
+          </div>
+          <button id="fetch-messages-btn" class="btn-primary">
+            Fetch Messages
+          </button>
+        </div>
 
-      <h2>Conversations</h2>
-      <button id="fetch-conversations-btn">Fetch All Conversations</button>
-
-      <h2>Messages</h2>
-      <div class="form-group">
-        <label for="conversation-jid">Conversation JID:</label>
-        <input
-          type="text"
-          id="conversation-jid"
-          placeholder="e.g. 1234567890@s.whatsapp.net"
-        />
+        <div id="response-container"></div>
       </div>
-      <button id="fetch-messages-btn">Fetch Messages</button>
-
-      <div id="response-container"></div>
     </div>
 
     <script>
@@ -301,7 +559,7 @@
       const checkNumBtn = document.getElementById("check-num-btn");
       const sendMsgBtn = document.getElementById("send-msg-btn");
       const fetchConversationsBtn = document.getElementById(
-        "fetch-conversations-btn",
+        "fetch-conversations-btn"
       );
       const conversationJidInput = document.getElementById("conversation-jid");
       const fetchMessagesBtn = document.getElementById("fetch-messages-btn");
@@ -312,7 +570,7 @@
       const businessLoadBtn = document.getElementById("business-load-btn");
       const businessSaveBtn = document.getElementById("business-save-btn");
       const businessRefreshBtn = document.getElementById(
-        "business-refresh-btn",
+        "business-refresh-btn"
       );
 
       const bizName = document.getElementById("biz-name");
@@ -402,7 +660,7 @@
             {
               method: "POST",
               headers: headers,
-            },
+            }
           );
 
           const data = await response.json();
@@ -495,7 +753,7 @@
             {
               method: "POST",
               headers,
-            },
+            }
           );
           const data = await response.json();
           if (!response.ok) {
@@ -510,7 +768,7 @@
             bizShipping.value = info.shipping_details || "";
             bizMobiles.value = fromArray(info.mobile_numbers);
             showBusinessStatus(
-              "Fetched and updated from WhatsApp (where available).",
+              "Fetched and updated from WhatsApp (where available)."
             );
           }
         } catch (e) {
@@ -532,7 +790,7 @@
             `${apiUrlInput.value}/api/session/status`,
             {
               headers: headers,
-            },
+            }
           );
 
           const data = await response.json();
@@ -562,7 +820,7 @@
             {
               method: "POST",
               headers: headers,
-            },
+            }
           );
 
           const data = await response.json();
@@ -606,7 +864,7 @@
               method: "POST",
               headers: headers,
               body: JSON.stringify({ to: phoneNumber }),
-            },
+            }
           );
 
           const data = await response.json();
@@ -649,7 +907,7 @@
               method: "POST",
               headers: headers,
               body: JSON.stringify({ to: phoneNumber, message: message }),
-            },
+            }
           );
 
           const data = await response.json();
@@ -678,7 +936,7 @@
             `${apiUrlInput.value}/api/message/conversations`,
             {
               headers: headers,
-            },
+            }
           );
 
           const data = await response.json();
@@ -710,10 +968,12 @@
 
         try {
           const response = await fetch(
-            `${apiUrlInput.value}/api/message/messages?jid=${encodeURIComponent(jid)}`,
+            `${apiUrlInput.value}/api/message/messages?jid=${encodeURIComponent(
+              jid
+            )}`,
             {
               headers: headers,
-            },
+            }
           );
 
           const data = await response.json();
@@ -735,8 +995,8 @@
         window.location.href = "user-management.html";
       });
 
-      // Check authentication on page load
-      document.addEventListener("DOMContentLoaded", () => {
+      // Check authentication on page load and automatically load business details
+      document.addEventListener("DOMContentLoaded", async () => {
         const token = localStorage.getItem("jwtToken");
         const tenantId = localStorage.getItem("tenantId");
         const savedApiUrl = localStorage.getItem("apiUrl");
@@ -754,6 +1014,32 @@
 
         // Display current tenant
         currentTenantDisplay.textContent = tenantId;
+
+        // Automatically load business details on page load
+        const headers = getAuthHeaders();
+        if (headers) {
+          try {
+            const response = await fetch(`${apiUrlInput.value}/api/business`, {
+              headers,
+            });
+            const data = await response.json();
+            if (response.ok) {
+              const info = data?.data || {};
+              bizName.value = info.name || "";
+              bizWebsite.value = info.website_url || "";
+              bizInstagram.value = info.instagram_url || "";
+              bizLocation.value = info.location_url || "";
+              bizWorkingHours.value = info.working_hours || "";
+              bizShipping.value = info.shipping_details || "";
+              bizMobiles.value = fromArray(info.mobile_numbers);
+              showBusinessStatus("Loaded business info.");
+            } else {
+              showBusinessStatus(data, true);
+            }
+          } catch (e) {
+            showBusinessStatus("Network error: " + e.message, true);
+          }
+        }
       });
     </script>
   </body>
