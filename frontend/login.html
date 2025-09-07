@@ -343,10 +343,12 @@
           const data = await response.json();
 
           if (response.ok) {
-            // Store token and redirect to session manager
+            // Store token and tenant info
             localStorage.setItem("jwtToken", data.token);
-            localStorage.setItem("tenantId", tenantId);
             localStorage.setItem("apiUrl", apiUrlInput.value);
+            // Store as global variable for session manager
+            window.currentTenantId = tenantId;
+            localStorage.setItem("tenantId", tenantId);
 
             showSuccess(loginSuccess, "Login successful! Redirecting...");
             setTimeout(() => {
@@ -399,10 +401,12 @@
           const data = await response.json();
 
           if (response.ok) {
-            // Store token and redirect to session manager
+            // Store token and tenant info
             localStorage.setItem("jwtToken", data.token);
-            localStorage.setItem("tenantId", tenantId);
             localStorage.setItem("apiUrl", apiUrlInput.value);
+            // Store as global variable for session manager
+            window.currentTenantId = tenantId;
+            localStorage.setItem("tenantId", tenantId);
 
             showSuccess(
               registerSuccess,
