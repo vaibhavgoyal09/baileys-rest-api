@@ -444,23 +444,16 @@ class IngestionService {
     records: IngestRecord[],
   ) {
     const started = nowMs();
+    console.log("Starting batch persistence - worker:", workerId, "batchSize:", records.length, "sampleMessageId:", records[0]?.payload?.id);
     try {
       await this.persistBatchSplitOnFailure(records, 0);
       const took = nowMs() - started;
       this.metrics.observeLatency(took);
       this.metrics.persisted += records.length;
-      logger.debug({
-        msg: "Persisted batch",
-        workerId,
-        size: records.length,
-        tookMs: took,
-      });
+      console.log("Successfully persisted batch - worker:", workerId, "size:", records.length, "tookMs:", took, "sampleMessageId:", records[0]?.payload?.id);
     } catch (e: any) {
       // Should not reach here; failures are handled with DLQ inside persistBatchSplitOnFailure
-      errorLogger.error({
-        msg: "Unhandled persistBatchWithRetry error",
-        error: e?.message || e,
-      });
+      console.log("Unhandled persistBatchWithRetry error:", e?.message || e);
     }
   }
 

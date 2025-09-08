@@ -375,13 +375,20 @@ class TenantSession {
       });
 
       this.sock.ev.on("messages.upsert", async (m: any) => {
+        console.log({
+          msg: "messages.upsert event triggered",
+          type: m.type,
+          messageCount: m.messages ? m.messages.length : 0,
+          tenantId: this.tenantId,
+        });
+      
         if (m.type === "notify") {
           try {
             await Promise.all(
               m.messages.map(async (msg: any) => {
                 const messageType = Object.keys(msg.message || {})[0] || "";
                 if (messageType === "protocolMessage") return;
-
+      
                 const messageInfo: MessageInfo = {
                   id: msg.key.id,
                   from: msg.key.remoteJid,
@@ -392,9 +399,16 @@ class TenantSession {
                   content: TenantManager.extractMessageContent(msg),
                   isGroup: msg.key.remoteJid?.endsWith("@g.us") || false,
                 };
-
+      
                 try {
                   const res = await ingestion.enqueueMessage(messageInfo);
+                  logger.info({
+                    msg: "Message enqueued successfully",
+                    accepted: res.accepted,
+                    idempotencyKey: res.idempotencyKey,
+                    correlationId: res.correlationId,
+                    tenantId: this.tenantId,
+                  });
                   if (!res.accepted) {
                     errorLogger.error({
                       msg: "Failed to enqueue incoming message",
@@ -411,7 +425,7 @@ class TenantSession {
                     tenantId: this.tenantId,
                   });
                 }
-
+      
                 const businessInfo = ConfigStore.getBusinessInfo(this.tenantId);
                 await TenantManager.notifyWebhook(
                   this.tenantId,
@@ -903,14 +917,13 @@ class TenantManager {
     data: any,
   ): Promise<void> {
     const webhookUrl = ConfigStore.getWebhookUrl(tenantId);
+    console.log("Checking webhook URL for tenant:", tenantId, "event:", event, "webhookUrl:", webhookUrl ? "configured" : "not configured");
     if (!webhookUrl) {
-      logger.warn({
-        msg: "Webhook URL not configured, skipping notification",
-        tenantId,
-      });
+      console.log("Webhook URL not configured, skipping notification for event:", event, "tenantId:", tenantId);
       return;
     }
 
+    console.log("Sending webhook notification for event:", event, "to URL:", webhookUrl);
     try {
       const response = await fetch(webhookUrl, {
         method: "POST",
@@ -929,18 +942,15 @@ class TenantManager {
       });
 
       if (!response.ok) {
+        console.log("Webhook request failed with status:", response.status, response.statusText);
         throw new Error(
           `Webhook request failed with status ${response.status}: ${response.statusText}`,
         );
       }
+
+      console.log("Webhook notification sent successfully for event:", event, "status:", response.status);
     } catch (error: any) {
-      errorLogger.error({
-        msg: "Error during webhook notification",
-        event,
-        tenantId,
-        error: error.message,
-        data: JSON.stringify(data),
-      });
+      console.log("Error during webhook notification:", event, "tenantId:", tenantId, "error:", error.message);
     }
   }
 
@@ -951,12 +961,12 @@ class TenantManager {
 
     switch (messageType) {
       case "conversation":
-        return { type: "text", text: messageContent };
+        return { type: "text", text: messageContent ?? "" };
       case "extendedTextMessage":
         return {
           type: "text",
-          text: messageContent.text,
-          contextInfo: messageContent.contextInfo,
+          text: messageContent?.text || "",
+          contextInfo: messageContent?.contextInfo || null,
         };
       case "imageMessage":
         return {

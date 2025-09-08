@@ -26,13 +26,6 @@ interface WhatsAppServiceResult {
   reason?: string;
 }
 
-interface MessageHistory {
-  chats: any;
-  contacts: any;
-  messages: any;
-  syncType: any;
-}
-
 interface ConnectionStatus {
   isConnected: boolean;
   qr: string | null;
@@ -428,6 +421,12 @@ class WhatsAppService {
       });
 
       this.sock.ev.on("messages.upsert", async (m: any) => {
+        logger.info({
+          msg: "messages.upsert event triggered",
+          type: m.type,
+          messageCount: m.messages ? m.messages.length : 0,
+        });
+      
         if (m.type === "notify") {
           try {
             await Promise.all(
@@ -437,13 +436,13 @@ class WhatsAppService {
                 if (messageType === "protocolMessage") {
                   return;
                 }
-
+      
                 // Debug log for raw message
-                logger.debug({
+                console.log({
                   msg: "Raw message received",
                   data: msg,
                 });
-
+      
                 // Extract relevant message information
                 const messageInfo: MessageInfo = {
                   id: msg.key.id,
@@ -455,16 +454,22 @@ class WhatsAppService {
                   content: WhatsAppService.extractMessageContent(msg),
                   isGroup: msg.key.remoteJid?.endsWith("@g.us") || false,
                 };
-
+      
                 // Debug log for processed message
                 logger.debug({
                   msg: "Processed message info",
                   data: messageInfo,
                 });
-
+      
                 // Enqueue to ingestion service
                 try {
                   const res = await ingestion.enqueueMessage(messageInfo);
+                  logger.info({
+                    msg: "Message enqueued successfully",
+                    accepted: res.accepted,
+                    idempotencyKey: res.idempotencyKey,
+                    correlationId: res.correlationId,
+                  });
                   if (!res.accepted) {
                     errorLogger.error({
                       msg: "Failed to enqueue incoming message",
@@ -479,7 +484,7 @@ class WhatsAppService {
                     error: (e as Error)?.message || e,
                   });
                 }
-
+      
                 // Send to webhook with business details
                 const businessInfo = Store.getBusinessInfo();
                 await WhatsAppService.notifyWebhook("message.received", {
@@ -1139,13 +1144,13 @@ class WhatsAppService {
 
     switch (messageType) {
       case "conversation":
-        return { type: "text", text: messageContent };
+        return { type: "text", text: messageContent ?? "" };
 
       case "extendedTextMessage":
         return {
           type: "text",
-          text: messageContent.text,
-          contextInfo: messageContent.contextInfo,
+          text: messageContent?.text || "",
+          contextInfo: messageContent?.contextInfo || null,
         };
 
       case "imageMessage":
