@@ -1,0 +1,80 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// WhatsApp Chat model
+model Chat {
+  jid                    String    @id
+  name                   String?
+  isGroup                Boolean   @default(false)
+  unreadCount            Int       @default(0)
+  lastMessageTimestamp   DateTime? @db.Timestamp(6)
+  lastMessageText        String?
+  messages               Message[]
+
+  @@map("chats")
+}
+
+// WhatsApp Message model
+model Message {
+  id          String    @id
+  jid         String
+  fromMe      Boolean   @default(false)
+  timestamp   DateTime? @db.Timestamp(6)
+  type        String?
+  pushName    String?
+  content     String?
+  chat        Chat      @relation(fields: [jid], references: [jid], onDelete: Cascade)
+
+  @@map("messages")
+}
+
+// Global Business Info (single row)
+model BusinessInfo {
+  id               Int       @id @default(1)
+  name             String?
+  workingHours     String?
+  locationUrl      String?
+  shippingDetails  String?
+  instagramUrl     String?
+  websiteUrl       String?
+  mobileNumbers    String?   // JSON string
+  lastUpdated      DateTime? @db.Timestamp(6)
+
+  @@map("business_info")
+}
+
+// Tenant/User configuration
+model User {
+  tenantId      String             @id
+  webhookUrl    String?
+  createdAt     DateTime           @default(now()) @db.Timestamp(6)
+  updatedAt     DateTime           @default(now()) @updatedAt @db.Timestamp(6)
+  businessInfo  BusinessInfoTenant?
+
+  @@map("users")
+}
+
+// Per-tenant Business Info
+model BusinessInfoTenant {
+  tenantId        String   @id
+  name            String?
+  workingHours    String?
+  locationUrl     String?
+  shippingDetails String?
+  instagramUrl    String?
+  websiteUrl      String?
+  mobileNumbers   String?  // JSON string
+  lastUpdated     DateTime @default(now()) @updatedAt @db.Timestamp(6)
+  user            User     @relation(fields: [tenantId], references: [tenantId], onDelete: Cascade)
+
+  @@map("business_info_tenant")
+}

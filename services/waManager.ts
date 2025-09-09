@@ -10,9 +10,9 @@ import { fileURLToPath } from "url";
 import { pino } from "pino";
 import fs from "fs/promises";
 import { logger, errorLogger } from "../utils/logger.js";
-import Store from "./sqliteStore.js";
+import Store from "./prismaStore.js";
 import ingestion from "./ingestion.js";
-import ConfigStore from "./configStore.js";
+import ConfigStore from "./prismaConfigStore.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -239,10 +239,10 @@ class TenantSession {
 
       this.sock.ev.on("creds.update", saveCreds);
 
-      this.sock.ev.on("chats.set", ({ chats }: any) => {
+      this.sock.ev.on("chats.set", async ({ chats }: any) => {
         try {
           const list = chats || [];
-          Store.upsertChats(list);
+          await Store.upsertChats(list);
         } catch (e) {
           errorLogger.error({
             msg: "Error syncing chats.set",
@@ -274,7 +274,7 @@ class TenantSession {
           const messages = history?.messages || [];
 
           if (chats.length) {
-            Store.upsertChats(chats);
+            await Store.upsertChats(chats);
           }
 
           if (contacts.length) {
@@ -282,7 +282,7 @@ class TenantSession {
               const jid = c.id || c.jid;
               if (!jid) continue;
               const name = c.name || c.notify || c.pushName || null;
-              Store.upsertChatPartial(jid, { name });
+              await Store.upsertChatPartial(jid, { name });
             }
           }
 
@@ -337,7 +337,7 @@ class TenantSession {
       this.sock.ev.on("messaging-history.set", processHistory as any);
       this.sock.ev.on("messaging.history-set", processHistory as any);
 
-      this.sock.ev.on("contacts.set", (contacts: any) => {
+      this.sock.ev.on("contacts.set", async (contacts: any) => {
         try {
           const list = Array.isArray(contacts)
             ? contacts
@@ -346,7 +346,7 @@ class TenantSession {
             const jid = c.id || c.jid;
             if (!jid) continue;
             const name = c.name || c.notify || c.pushName || null;
-            Store.upsertChatPartial(jid, { name });
+            await Store.upsertChatPartial(jid, { name });
           }
         } catch (e) {
           errorLogger.error({
@@ -357,14 +357,14 @@ class TenantSession {
         }
       });
 
-      this.sock.ev.on("contacts.upsert", (contacts: any) => {
+      this.sock.ev.on("contacts.upsert", async (contacts: any) => {
         try {
-          (contacts || []).forEach((c: any) => {
+          for (const c of (contacts || [])) {
             const jid = c.id || c.jid;
-            if (!jid) return;
+            if (!jid) continue;
             const name = c.name || c.notify || c.pushName || null;
-            Store.upsertChatPartial(jid, { name });
-          });
+            await Store.upsertChatPartial(jid, { name });
+          }
         } catch (e) {
           errorLogger.error({
             msg: "Error processing contacts.upsert",
@@ -426,7 +426,7 @@ class TenantSession {
                   });
                 }
       
-                const businessInfo = ConfigStore.getBusinessInfo(this.tenantId);
+                const businessInfo = await ConfigStore.getBusinessInfo(this.tenantId);
                 await TenantManager.notifyWebhook(
                   this.tenantId,
                   "message.received",
@@ -571,13 +571,13 @@ class TenantSession {
   }
 
   async refreshBusinessInfo(): Promise<{
-    stored: ReturnType<typeof ConfigStore.getBusinessInfo>;
+    stored: Awaited<ReturnType<typeof ConfigStore.getBusinessInfo>>;
     fetched: any | null;
     persisted: boolean;
     reason?: string;
   }> {
     try {
-      const existing = ConfigStore.getBusinessInfo(this.tenantId);
+      const existing = await ConfigStore.getBusinessInfo(this.tenantId);
 
       if (!this.sock || !this.isConnected) {
         return {
@@ -671,7 +671,7 @@ class TenantSession {
         })(),
       };
 
-      ConfigStore.setBusinessInfo(this.tenantId, {
+      await ConfigStore.setBusinessInfo(this.tenantId, {
         name: mapped.name,
         working_hours: mapped.working_hours,
         location_url: mapped.location_url,
@@ -681,7 +681,7 @@ class TenantSession {
         mobile_numbers: (mapped as any).mobile_numbers ?? null,
       });
 
-      const updated = ConfigStore.getBusinessInfo(this.tenantId);
+      const updated = await ConfigStore.getBusinessInfo(this.tenantId);
 
       return {
         stored: updated,
@@ -695,7 +695,7 @@ class TenantSession {
         error: (e as Error)?.message || e,
       });
       return {
-        stored: ConfigStore.getBusinessInfo(this.tenantId),
+        stored: await ConfigStore.getBusinessInfo(this.tenantId),
         fetched: null,
         persisted: false,
         reason: "exception",
@@ -916,7 +916,7 @@ class TenantManager {
     event: string,
     data: any,
   ): Promise<void> {
-    const webhookUrl = ConfigStore.getWebhookUrl(tenantId);
+    const webhookUrl = await ConfigStore.getWebhookUrl(tenantId);
     console.log("Checking webhook URL for tenant:", tenantId, "event:", event, "webhookUrl:", webhookUrl ? "configured" : "not configured");
     if (!webhookUrl) {
       console.log("Webhook URL not configured, skipping notification for event:", event, "tenantId:", tenantId);

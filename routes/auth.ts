@@ -1,6 +1,6 @@
 import express, { Request, Response } from "express";
 import { signJwt } from "../utils/jwt.js";
-import ConfigStore from "../services/configStore.js";
+import ConfigStore from "../services/prismaConfigStore.js";
 import validator from "../middlewares/validator.js";
 import { issueToken } from "../validators/user.js";
 
@@ -23,12 +23,12 @@ router.post(
       const { tenantId, webhook_url } = req.body || {};
 
       if (webhook_url !== undefined) {
-        ConfigStore.upsertUserConfig(tenantId, {
+        await ConfigStore.upsertUserConfig(tenantId, {
           webhook_url: webhook_url ?? null,
         });
       } else {
         // ensure tenant exists
-        ConfigStore.upsertUserConfig(tenantId, { webhook_url: null });
+        await ConfigStore.upsertUserConfig(tenantId, { webhook_url: null });
       }
 
       const token = signJwt({ userId: tenantId });
@@ -37,7 +37,7 @@ router.post(
         token,
         token_type: "Bearer",
         tenantId,
-        webhook_url: ConfigStore.getWebhookUrl(tenantId),
+        webhook_url: await ConfigStore.getWebhookUrl(tenantId),
       });
     } catch (error) {
       (res as any).sendError(500, error);

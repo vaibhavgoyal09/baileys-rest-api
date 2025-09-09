@@ -10,9 +10,9 @@ import { fileURLToPath } from "url";
 import { pino } from "pino";
 import fs from "fs/promises";
 import { logger, errorLogger } from "../utils/logger.js";
-import Store, { Chat } from "./sqliteStore.js";
+import Store, { Chat } from "./prismaStore.js";
 import ingestion from "./ingestion.js";
-import ConfigStore from "./configStore.js";
+import ConfigStore from "./prismaConfigStore.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -250,7 +250,7 @@ class WhatsAppService {
 
       // removed duplicate empty handler for messaging-history.set (handled below with processHistory)
 
-      this.sock.ev.on("chats.set", ({ chats }: any) => {
+      this.sock.ev.on("chats.set", async ({ chats }: any) => {
         try {
           const list = chats || [];
           logger.debug({
@@ -258,7 +258,7 @@ class WhatsAppService {
             count: list.length,
             chats: list.slice(0, 3), // Log first 3 chats for debugging
           });
-          Store.upsertChats(list);
+          await Store.upsertChats(list);
           logger.debug({
             msg: "Chats set synced successfully",
             count: list.length,
@@ -272,7 +272,7 @@ class WhatsAppService {
       });
 
       // also handle chats.upsert to catch subsequent updates or when initial set isn't emitted
-      this.sock.ev.on("chats.upsert", (payload: any) => {
+      this.sock.ev.on("chats.upsert", async (payload: any) => {
         try {
           const list = Array.isArray(payload) ? payload : payload?.chats || [];
           const arr = list || [];
@@ -282,7 +282,7 @@ class WhatsAppService {
             chats: arr.slice(0, 3),
           });
           if (arr.length) {
-            Store.upsertChats(arr);
+            await Store.upsertChats(arr);
             logger.debug({ msg: "Chats upsert processed", count: arr.length });
           }
         } catch (e) {
@@ -308,7 +308,7 @@ class WhatsAppService {
           });
 
           if (chats.length) {
-            Store.upsertChats(chats);
+            await Store.upsertChats(chats);
           }
 
           if (contacts.length) {
@@ -316,7 +316,7 @@ class WhatsAppService {
               const jid = c.id || c.jid;
               if (!jid) continue;
               const name = c.name || c.notify || c.pushName || null;
-              Store.upsertChatPartial(jid, { name });
+              await Store.upsertChatPartial(jid, { name });
             }
           }
 
@@ -377,7 +377,7 @@ class WhatsAppService {
       this.sock.ev.on("messaging.history-set", processHistory as any);
 
       // also backfill contacts when set in bulk (some versions emit contacts.set once)
-      this.sock.ev.on("contacts.set", (contacts: any) => {
+      this.sock.ev.on("contacts.set", async (contacts: any) => {
         try {
           const list = Array.isArray(contacts)
             ? contacts
@@ -386,7 +386,7 @@ class WhatsAppService {
             const jid = c.id || c.jid;
             if (!jid) continue;
             const name = c.name || c.notify || c.pushName || null;
-            Store.upsertChatPartial(jid, { name });
+            await Store.upsertChatPartial(jid, { name });
           }
           logger.debug({
             msg: "contacts.set processed",
@@ -400,14 +400,14 @@ class WhatsAppService {
         }
       });
 
-      this.sock.ev.on("contacts.upsert", (contacts: any) => {
+      this.sock.ev.on("contacts.upsert", async (contacts: any) => {
         try {
-          (contacts || []).forEach((c: any) => {
+          for (const c of (contacts || [])) {
             const jid = c.id || c.jid;
-            if (!jid) return;
+            if (!jid) continue;
             const name = c.name || c.notify || c.pushName || null;
-            Store.upsertChatPartial(jid, { name });
-          });
+            await Store.upsertChatPartial(jid, { name });
+          }
           logger.debug({
             msg: "Contacts upsert processed",
             count: (contacts || []).length,
@@ -486,7 +486,7 @@ class WhatsAppService {
                 }
       
                 // Send to webhook with business details
-                const businessInfo = Store.getBusinessInfo();
+                const businessInfo = await Store.getBusinessInfo();
                 await WhatsAppService.notifyWebhook("message.received", {
                   message: messageInfo,
                   business: businessInfo,
@@ -629,7 +629,7 @@ class WhatsAppService {
   }
 
   static async notifyWebhook(event: string, data: any): Promise<void> {
-    const webhookUrl = ConfigStore.getWebhookUrl("default");
+    const webhookUrl = await ConfigStore.getWebhookUrl("default");
     if (!webhookUrl) {
       logger.warn({
         msg: "Webhook URL not configured, skipping notification",
@@ -685,14 +685,14 @@ class WhatsAppService {
    * Falls back gracefully if running on a non-business account or API not available.
    */
   async refreshBusinessInfo(): Promise<{
-    stored: ReturnType<typeof Store.getBusinessInfo>;
+    stored: Awaited<ReturnType<typeof Store.getBusinessInfo>>;
     fetched: any | null;
     persisted: boolean;
     reason?: string;
   }> {
     try {
       // read existing
-      const existing = Store.getBusinessInfo();
+      const existing = await Store.getBusinessInfo();
 
       if (!this.sock || !this.isConnected) {
         // no active connection, just return what we have
@@ -795,7 +795,7 @@ class WhatsAppService {
       };
 
       // If we fetched nothing meaningful, still persist name/about improvements if any
-      Store.setBusinessInfo({
+      await Store.setBusinessInfo({
         name: mapped.name,
         working_hours: mapped.working_hours,
         location_url: mapped.location_url,
@@ -805,7 +805,7 @@ class WhatsAppService {
         mobile_numbers: mapped.mobile_numbers ?? null,
       });
 
-      const updated = Store.getBusinessInfo();
+      const updated = await Store.getBusinessInfo();
 
       return {
         stored: updated,
@@ -818,7 +818,7 @@ class WhatsAppService {
         error: (e as Error)?.message || e,
       });
       return {
-        stored: Store.getBusinessInfo(),
+        stored: await Store.getBusinessInfo(),
         fetched: null,
         persisted: false,
         reason: "exception",
@@ -845,7 +845,7 @@ class WhatsAppService {
       });
 
       // First try to sync chats if database is empty
-      const existingConversations = Store.listConversations({
+      const existingConversations = await Store.listConversations({
         limit: 1,
         cursor: null,
       });
@@ -863,7 +863,7 @@ class WhatsAppService {
         // await this.syncChatsFromStore();
       }
 
-      const conversations = Store.listConversations({ limit, cursor });
+      const conversations = await Store.listConversations({ limit, cursor });
 
       logger.debug({
         msg: "getConversations result",
@@ -888,7 +888,7 @@ class WhatsAppService {
         options.cursor !== undefined && options.cursor !== null
           ? Number(options.cursor)
           : null;
-      return Store.listMessages(jid, { limit, cursor });
+      return await Store.listMessages(jid, { limit, cursor });
     } catch (error: any) {
       errorLogger.error({
         msg: "Failed to get messages",
@@ -912,7 +912,7 @@ class WhatsAppService {
     try {
       let page = 0;
       // we require an oldest anchor to go further back in history
-      let anchor = Store.getOldestMessageAnchor(jid);
+      let anchor = await Store.getOldestMessageAnchor(jid);
       if (!anchor) {
         logger.debug({
           msg: "No local messages to anchor history backfill, skipping chat",
@@ -954,7 +954,7 @@ class WhatsAppService {
         await this.delay(500);
 
         // compute new oldest anchor after persist
-        const newAnchor = Store.getOldestMessageAnchor(jid);
+        const newAnchor = await Store.getOldestMessageAnchor(jid);
         if (!newAnchor) {
           logger.debug({
             msg: "No more messages after fetch, stopping backfill",
@@ -1002,7 +1002,7 @@ class WhatsAppService {
     }
     try {
       const conversations =
-        Store.listConversations({ limit: 1000, cursor: null }) || [];
+        await Store.listConversations({ limit: 1000, cursor: null }) || [];
       logger.info({
         msg: "Starting history backfill on reconnect",
         chatCount: conversations.length,

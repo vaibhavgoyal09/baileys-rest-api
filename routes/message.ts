@@ -4,7 +4,7 @@ const router = express.Router();
 import verifyToken from "../middlewares/verifyToken.js";
 import validator from "../middlewares/validator.js";
 import WAManager from "../services/waManager.js";
-import Store from "../services/sqliteStore.js";
+import Store from "../services/prismaStore.js";
 import {
   sendText,
   checkNumber,
@@ -63,7 +63,7 @@ router.get(
   async (req: Request, res: Response): Promise<void> => {
     try {
       const options = req.query;
-      const conversations = Store.listConversations({
+      const conversations = await Store.listConversations({
         limit: options.limit ? Number(options.limit) : 50,
         cursor: options.cursor !== undefined ? Number(options.cursor) : null,
       });
@@ -82,7 +82,7 @@ router.get("/messages", async (req: Request, res: Response): Promise<void> => {
       return;
     }
     const options = req.query;
-    const messages = Store.listMessages(jid as string, {
+    const messages = await Store.listMessages(jid as string, {
       limit: options.limit ? Number(options.limit) : 50,
       cursor: options.cursor !== undefined ? Number(options.cursor) : null,
     });

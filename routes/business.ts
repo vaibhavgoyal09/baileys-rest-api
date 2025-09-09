@@ -1,7 +1,7 @@
 import express, { Request, Response } from "express";
 import verifyToken from "../middlewares/verifyToken.js";
 import validator from "../middlewares/validator.js";
-import ConfigStore from "../services/configStore.js";
+import ConfigStore from "../services/prismaConfigStore.js";
 import WAManager from "../services/waManager.js";
 import { updateBusinessInfo } from "../validators/business.js";
 import { setWebhook } from "../validators/user.js";
@@ -18,7 +18,7 @@ router.get(
   async (req: Request, res: Response): Promise<void> => {
     try {
       const tenantId = (req as any).user?.userId as string;
-      const info = ConfigStore.getBusinessInfo(tenantId);
+      const info = await ConfigStore.getBusinessInfo(tenantId);
       (res as any).sendResponse(200, { success: true, data: info });
     } catch (error) {
       (res as any).sendError(500, error);
@@ -47,7 +47,7 @@ router.put(
         mobile_numbers = undefined,
       } = req.body || {};
 
-      ConfigStore.setBusinessInfo(tenantId, {
+      await ConfigStore.setBusinessInfo(tenantId, {
         name,
         working_hours,
         location_url,
@@ -57,7 +57,7 @@ router.put(
         mobile_numbers,
       });
 
-      const updated = ConfigStore.getBusinessInfo(tenantId);
+      const updated = await ConfigStore.getBusinessInfo(tenantId);
       (res as any).sendResponse(200, {
         success: true,
         message: "Business info updated",
@@ -100,13 +100,13 @@ router.put(
     try {
       const tenantId = (req as any).user?.userId as string;
       const { webhook_url } = req.body || {};
-      ConfigStore.upsertUserConfig(tenantId, {
+      await ConfigStore.upsertUserConfig(tenantId, {
         webhook_url: webhook_url ?? null,
       });
       (res as any).sendResponse(200, {
         success: true,
         message: "Webhook updated",
-        webhook_url: ConfigStore.getWebhookUrl(tenantId),
+        webhook_url: await ConfigStore.getWebhookUrl(tenantId),
       });
     } catch (error) {
       (res as any).sendError(500, error);

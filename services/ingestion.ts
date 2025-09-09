@@ -4,7 +4,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import readline from "readline";
 import { logger, errorLogger } from "../utils/logger.js";
-import Store from "./sqliteStore.js";
+import Store from "./prismaStore.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

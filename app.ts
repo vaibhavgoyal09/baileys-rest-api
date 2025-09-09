@@ -16,7 +16,7 @@ import authRoutes from "./routes/auth.js";
 
 // Services
 import ingestion from "./services/ingestion.js";
-import Store from "./services/sqliteStore.js";
+import Store from "./services/prismaStore.js";
 import waManager from "./services/waManager.js";
 
 // Logger

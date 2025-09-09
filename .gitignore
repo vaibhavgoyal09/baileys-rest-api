@@ -67,3 +67,4 @@ typings/
 .vercel
 
 sessions/
+/generated/prisma

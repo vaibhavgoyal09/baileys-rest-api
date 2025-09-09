@@ -26,6 +26,7 @@
   "dependencies": {
     "@hapi/boom": "^10.0.1",
     "@naanzitos/baileys-make-in-memory-store": "^1.0.5",
+    "@prisma/client": "^6.15.0",
     "@types/jsonwebtoken": "^9.0.10",
     "@whiskeysockets/baileys": "^6.7.19",
     "bcrypt": "^5.1.1",
@@ -35,8 +36,10 @@
     "express": "^4.19.2",
     "joi": "^17.12.3",
     "jsonwebtoken": "^9.0.2",
+    "pg": "^8.16.3",
     "pino": "^8.20.0",
     "pino-pretty": "^11.0.0",
+    "prisma": "^6.15.0",
     "qrcode": "^1.5.4",
     "yargs": "^17.7.2"
   },
