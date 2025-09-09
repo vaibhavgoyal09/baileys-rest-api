@@ -17,9 +17,9 @@ router.post(
   validator(checkNumber),
   async (req: Request, res: Response): Promise<void> => {
     try {
-      const tenantId = (req as any).user?.userId as string;
+      const username = (req as any).user?.userId as string;
       const { to } = req.body;
-      const result = await WAManager.checkNumber(tenantId, to);
+      const result = await WAManager.checkNumber(username, to);
       (res as any).sendResponse(200, result);
     } catch (error) {
       (res as any).sendError(500, error);
@@ -34,19 +34,20 @@ router.post(
   async (req: Request, res: Response): Promise<void> => {
     try {
       // Require tenant id from query instead of decoding from auth token
-      const tenantId = (req.query.tenantId ||
+      const username = (req.query.username ||
+        req.query.tenantId ||
         req.query.tenant_id ||
         req.query.tid) as string | undefined;
-      if (!tenantId || typeof tenantId !== "string" || !tenantId.trim()) {
+      if (!username || typeof username !== "string" || !username.trim()) {
         (res as any).sendError(
           400,
-          "tenantId is required as a query parameter",
+          "username is required as a query parameter",
         );
         return;
       }
 
       const { to, message } = req.body;
-      const result = await WAManager.sendMessage(tenantId.trim(), to, message);
+      const result = await WAManager.sendMessage(username!.trim(), to, message);
       (res as any).sendResponse(200, result);
     } catch (error) {
       (res as any).sendError(500, error);

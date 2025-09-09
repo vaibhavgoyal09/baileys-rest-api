@@ -439,21 +439,176 @@
         word-wrap: break-word;
       }
 
+      .session-status {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+        font-size: 0.9rem;
+        font-weight: 500;
+      }
+
+      .session-status.connecting {
+        background-color: rgba(245, 158, 11, 0.1);
+        border: 1px solid rgba(245, 158, 11, 0.2);
+        color: var(--warning);
+      }
+
+      .session-status.connected {
+        background-color: rgba(16, 185, 129, 0.1);
+        border: 1px solid rgba(16, 185, 129, 0.2);
+        color: var(--success);
+      }
+
+      .session-status.error {
+        background-color: rgba(239, 68, 68, 0.1);
+        border: 1px solid rgba(239, 68, 68, 0.2);
+        color: var(--error);
+      }
+
+      .session-status.hidden {
+        display: none;
+      }
+
+      .spinner {
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(245, 158, 11, 0.3);
+        border-top: 2px solid var(--warning);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+
       @media (max-width: 768px) {
         .grid-2 {
           grid-template-columns: 1fr;
         }
-
+      
         .btn-row {
           flex-direction: column;
         }
-
+      
         .action-buttons {
           flex-direction: column;
         }
-
+      
         .section {
           padding: 1rem;
+        }
+      
+        .qr-layout {
+          flex-direction: column;
+        }
+      
+        .qr-code-container {
+          max-width: 100%;
+        }
+      
+        .connection-steps {
+          order: 2;
+        }
+      }
+      
+      /* QR Connection Dialog Styles */
+      .qr-dialog {
+        text-align: center;
+        padding: 1rem;
+      }
+      
+      .qr-dialog h4 {
+        color: var(--light);
+        margin-bottom: 1rem;
+        font-size: 1.25rem;
+        font-weight: 600;
+      }
+      
+      .qr-layout {
+        display: flex;
+        gap: 1.5rem;
+        align-items: flex-start;
+        justify-content: center;
+        margin: 1rem 0;
+      }
+      
+      .qr-code-container {
+        flex: 0 0 300px;
+        background: #ffffff;
+        padding: 1rem;
+        border-radius: 12px;
+        border: 1px solid var(--gray-600);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      }
+      
+      .qr-code-container img {
+        max-width: 250px;
+        width: 100%;
+        height: auto;
+        border-radius: 8px;
+      }
+      
+      .connection-steps {
+        flex: 1;
+        max-width: 400px;
+        text-align: left;
+        background: var(--dark-tertiary);
+        border-radius: 8px;
+        padding: 1rem;
+        border: 1px solid var(--gray-600);
+      }
+      
+      .connection-steps h5 {
+        color: var(--primary);
+        margin-bottom: 0.75rem;
+        font-size: 1.1rem;
+        font-weight: 600;
+        text-align: center;
+      }
+      
+      .connection-steps ol {
+        list-style-position: inside;
+        color: var(--light);
+        font-size: 0.95rem;
+        line-height: 1.5;
+        margin: 0;
+        padding-left: 0;
+      }
+      
+      .connection-steps li {
+        margin-bottom: 0.5rem;
+        padding-left: 0.5rem;
+      }
+      
+      .connection-steps li:before {
+        content: "→ ";
+        color: var(--primary);
+        font-weight: bold;
+      }
+      
+      .qr-status {
+        margin-top: 1rem;
+        padding: 0.75rem;
+        border-radius: 6px;
+        font-size: 0.9rem;
+        text-align: center;
+      }
+      
+      .qr-status.connecting {
+        background: rgba(245, 158, 11, 0.1);
+        border: 1px solid rgba(245, 158, 11, 0.3);
+        color: var(--warning);
+      }
+      
+      @media (max-width: 768px) {
+        .qr-code-container {
+          padding: 0.75rem;
+          flex: 1;
+        }
+      
+        .connection-steps {
+          padding: 0.75rem;
+          order: 2;
         }
       }
     </style>
@@ -465,13 +620,9 @@
       </header>
 
       <div class="content">
-        <div class="form-group">
-          <label for="api-url">API Server URL:</label>
-          <input type="text" id="api-url" value="http://localhost:3001" />
-        </div>
 
         <div class="form-group">
-          <label>Current Tenant:</label>
+          <label>Current User:</label>
           <div
             id="current-tenant"
             style="
@@ -481,6 +632,11 @@
               border: 1px solid var(--gray-300);
             "
           ></div>
+        </div>
+
+        <div id="session-status" class="session-status hidden">
+          <div class="spinner" id="status-spinner" style="display: none;"></div>
+          <span id="status-text"></span>
         </div>
 
         <div class="btn-row">
@@ -665,8 +821,7 @@
     </div>
 
     <script>
-      const apiUrlInput = document.getElementById("api-url");
-      const currentTenantDisplay = document.getElementById("current-tenant");
+      const currentUserDisplay = document.getElementById("current-tenant");
       const startBtn = document.getElementById("start-btn");
       const statusBtn = document.getElementById("status-btn");
       const logoutBtn = document.getElementById("logout-btn");
@@ -681,6 +836,11 @@
       const fetchMessagesBtn = document.getElementById("fetch-messages-btn");
       const responseContainer = document.getElementById("response-container");
       const userManagementBtn = document.getElementById("user-management-btn");
+
+      // Session status elements
+      const sessionStatus = document.getElementById("session-status");
+      const statusText = document.getElementById("status-text");
+      const statusSpinner = document.getElementById("status-spinner");
 
       // Modal elements
       const modal = document.getElementById("response-modal");
@@ -739,35 +899,113 @@
         };
       }
 
+      function updateSessionStatus(statusClass, message = '') {
+        sessionStatus.className = `session-status ${statusClass}`;
+        statusText.textContent = message || statusClass.charAt(0).toUpperCase() + statusClass.slice(1);
+        if (statusClass === 'connecting') {
+          statusSpinner.style.display = 'block';
+        } else {
+          statusSpinner.style.display = 'none';
+        }
+        sessionStatus.classList.remove('hidden');
+      }
+
+      function hideAllSections() {
+        const sections = document.querySelectorAll('.section');
+        sections.forEach(section => {
+          section.style.display = 'none';
+        });
+      }
+
+      function showAllSections() {
+        const sections = document.querySelectorAll('.section');
+        sections.forEach(section => {
+          section.style.display = 'block';
+        });
+      }
+
 
       function showResponse(data, isError = false) {
         hideLoading();
         modalContent.innerHTML = "";
-        const responseDiv = document.createElement("div");
-        responseDiv.className = `response ${isError ? "error" : "success"}`;
-
+      
+        // Set modal title dynamically
+        const modalTitle = document.getElementById("modal-title");
         if (data.qrBase64) {
+          modalTitle.textContent = "Connect to WhatsApp";
+        } else {
+          modalTitle.textContent = "API Response";
+        }
+      
+        if (data.qrBase64 && !isError) {
+          // Custom QR dialog UI
+          const qrDiv = document.createElement("div");
+          qrDiv.className = "qr-dialog";
+      
+          const title = document.createElement("h4");
+          title.textContent = "Scan QR Code to Connect";
+          qrDiv.appendChild(title);
+
+          const layoutDiv = document.createElement("div");
+          layoutDiv.className = "qr-layout";
+
+          const qrContainer = document.createElement("div");
+          qrContainer.className = "qr-code-container";
           const qrImg = document.createElement("img");
           qrImg.src = data.qrBase64;
-          qrImg.alt = "QR Code";
-          qrImg.style.maxWidth = "200px";
-          qrImg.style.marginBottom = "10px";
-          modalContent.appendChild(qrImg);
-        }
+          qrImg.alt = "QR Code for WhatsApp Connection";
+          qrContainer.appendChild(qrImg);
+          layoutDiv.appendChild(qrContainer);
 
-        const pre = document.createElement("pre");
-        let content = "";
-        if (data.qrBase64) {
-          content += "QR Code generated. Scan to connect.\n\n";
-        }
-        if (typeof data === "string") {
-          content += data;
+          const stepsDiv = document.createElement("div");
+          stepsDiv.className = "connection-steps";
+          const stepsTitle = document.createElement("h5");
+          stepsTitle.textContent = "How to Connect:";
+          stepsDiv.appendChild(stepsTitle);
+
+          const ol = document.createElement("ol");
+          const steps = [
+            "Open WhatsApp on your phone.",
+            "Tap the three dots menu (Android) or Settings tab (iOS).",
+            "Select 'Linked Devices'.",
+            "Tap 'Link a Device'.",
+            "Scan the QR code displayed on your screen."
+          ];
+          steps.forEach(step => {
+            const li = document.createElement("li");
+            li.textContent = step;
+            ol.appendChild(li);
+          });
+          stepsDiv.appendChild(ol);
+          layoutDiv.appendChild(stepsDiv);
+
+          qrDiv.appendChild(layoutDiv);
+
+          const statusDiv = document.createElement("div");
+          statusDiv.className = "qr-status connecting";
+          statusDiv.textContent = "Waiting for scan... Please scan the QR code with WhatsApp.";
+          qrDiv.appendChild(statusDiv);
+
+          modalContent.appendChild(qrDiv);
+      
+          // Optional: Start polling to update status when connected
+          // This can be enhanced later if needed
         } else {
-          content += JSON.stringify(data, null, 2);
+          // Fallback to original response display
+          const responseDiv = document.createElement("div");
+          responseDiv.className = `response ${isError ? "error" : "success"}`;
+      
+          const pre = document.createElement("pre");
+          let content = "";
+          if (typeof data === "string") {
+            content += data;
+          } else {
+            content += JSON.stringify(data, null, 2);
+          }
+          pre.textContent = content;
+          responseDiv.appendChild(pre);
+          modalContent.appendChild(responseDiv);
         }
-        pre.textContent = content;
-        responseDiv.appendChild(pre);
-        modalContent.appendChild(responseDiv);
       }
 
       function showBusinessStatus(msg, isError = false) {
@@ -807,7 +1045,7 @@
 
         try {
           const response = await fetch(
-            `${apiUrlInput.value}/api/session/start`,
+            `/api/session/start`,
             {
               method: "POST",
               headers: headers,
@@ -816,12 +1054,26 @@
 
           const data = await response.json();
           if (response.ok) {
-            showResponse(data);
+            if (data.status === 'connected') {
+              // Close modal and update status for successful connection
+              modal.style.display = 'none';
+              updateSessionStatus('connected', 'Session connected');
+              showAllSections();
+              // Still show a brief success message
+              showResponse({ message: 'Successfully connected to WhatsApp!' });
+            } else if (data.status === 'waiting_qr') {
+              showResponse(data);
+              updateSessionStatus('connecting', 'Please scan the QR code in the modal to connect');
+            } else {
+              showResponse(data);
+            }
           } else {
             showResponse(data, true);
+            updateSessionStatus('error', data.message || 'Failed to start session');
           }
         } catch (error) {
           showResponse("Network error: " + error.message, true);
+          updateSessionStatus('error', 'Network error: ' + error.message);
         }
 
         startBtn.disabled = false;
@@ -835,7 +1087,7 @@
 
         businessLoadBtn.disabled = true;
         try {
-          const response = await fetch(`${apiUrlInput.value}/api/business`, {
+          const response = await fetch(`/api/business`, {
             headers,
           });
           const data = await response.json();
@@ -874,7 +1126,7 @@
             website_url: bizWebsite.value || null,
             mobile_numbers: toArray(bizMobiles.value),
           };
-          const response = await fetch(`${apiUrlInput.value}/api/business`, {
+          const response = await fetch(`/api/business`, {
             method: "PUT",
             headers,
             body: JSON.stringify(payload),
@@ -900,7 +1152,7 @@
         businessRefreshBtn.textContent = "Fetching...";
         try {
           const response = await fetch(
-            `${apiUrlInput.value}/api/business/refresh`,
+            `/api/business/refresh`,
             {
               method: "POST",
               headers,
@@ -939,7 +1191,7 @@
 
         try {
           const response = await fetch(
-            `${apiUrlInput.value}/api/session/status`,
+            `/api/session/status`,
             {
               headers: headers,
             }
@@ -969,7 +1221,7 @@
 
         try {
           const response = await fetch(
-            `${apiUrlInput.value}/api/session/logout`,
+            `/api/session/logout`,
             {
               method: "POST",
               headers: headers,
@@ -979,19 +1231,20 @@
           const data = await response.json();
           if (response.ok) {
             showResponse(data);
-            // Clear local storage and redirect to login
-            localStorage.removeItem("jwtToken");
-            localStorage.removeItem("tenantId");
-            localStorage.removeItem("apiUrl");
-            setTimeout(() => {
-              window.location.href = "login.html";
-            }, 2000);
           } else {
+            // Still show the response but don't treat it as a blocking error
             showResponse(data, true);
           }
         } catch (error) {
+          // Show network error but don't block logout
           showResponse("Network error: " + error.message, true);
         }
+
+        // Always clear local storage and redirect to login, regardless of API response
+        localStorage.clear();
+        setTimeout(() => {
+          window.location.href = "login.html";
+        }, 2000);
 
         logoutBtn.disabled = false;
         logoutBtn.textContent = "Logout";
@@ -1012,7 +1265,7 @@
 
         try {
           const response = await fetch(
-            `${apiUrlInput.value}/api/message/check-number`,
+            `/api/message/check-number`,
             {
               method: "POST",
               headers: headers,
@@ -1050,9 +1303,9 @@
           return;
         }
 
-        const tenantId = currentTenantDisplay.textContent?.trim();
-        if (!tenantId) {
-          alert("Tenant ID not found. Please login again.");
+        const username = currentUserDisplay.textContent?.trim();
+        if (!username) {
+          alert("Username not found. Please login again.");
           return;
         }
         showLoading();
@@ -1061,9 +1314,7 @@
 
         try {
           const response = await fetch(
-            `${
-              apiUrlInput.value
-            }/api/message/send-text?tenantId=${encodeURIComponent(tenantId)}`,
+            `/api/message/send-text?username=${encodeURIComponent(username)}`,
             {
               method: "POST",
               headers: headers,
@@ -1094,7 +1345,7 @@
 
         try {
           const response = await fetch(
-            `${apiUrlInput.value}/api/message/conversations`,
+            `/api/message/conversations`,
             {
               headers: headers,
             }
@@ -1129,7 +1380,7 @@
 
         try {
           const response = await fetch(
-            `${apiUrlInput.value}/api/message/messages?jid=${encodeURIComponent(
+            `/api/message/messages?jid=${encodeURIComponent(
               jid
             )}`,
             {
@@ -1153,53 +1404,65 @@
 
       // User management navigation
       userManagementBtn.addEventListener("click", () => {
-        window.location.href = "user-management.html";
+        window.location.href = "settings.html";
       });
 
       // Check authentication on page load and automatically load business details
       document.addEventListener("DOMContentLoaded", async () => {
         const token = localStorage.getItem("jwtToken");
-        const tenantId = localStorage.getItem("tenantId");
-        const savedApiUrl = localStorage.getItem("apiUrl");
+        const username = localStorage.getItem("username");
 
-        if (!token || !tenantId) {
+        if (!token || !username) {
           alert("Please login first");
           window.location.href = "login.html";
           return;
         }
 
-        // Set API URL if saved
-        if (savedApiUrl) {
-          apiUrlInput.value = savedApiUrl;
+        // Display current username
+        currentUserDisplay.textContent = username;
+
+        // Initially hide sections
+        hideAllSections();
+
+        // Check session status on load (manual start required if not connected)
+        updateSessionStatus('connecting', 'Checking session status...');
+        const headers = getAuthHeaders();
+        if (!headers) return;
+
+        try {
+          const sessionResponse = await fetch(`/api/session/status`, { headers });
+          const sessionData = await sessionResponse.json();
+          if (sessionResponse.ok && sessionData.isConnected) {
+            updateSessionStatus('connected', 'Session active');
+            showAllSections();
+          } else {
+            updateSessionStatus('error', 'Session not active. Please click "Start Session" to connect manually.');
+          }
+        } catch (error) {
+          updateSessionStatus('error', 'Network error checking session: ' + error.message + '. Please try starting session manually.');
         }
 
-        // Display current tenant
-        currentTenantDisplay.textContent = tenantId;
-
         // Automatically load business details on page load
-        const headers = getAuthHeaders();
-        if (headers) {
-          try {
-            const response = await fetch(`${apiUrlInput.value}/api/business`, {
-              headers,
-            });
-            const data = await response.json();
-            if (response.ok) {
-              const info = data?.data || {};
-              bizName.value = info.name || "";
-              bizWebsite.value = info.website_url || "";
-              bizInstagram.value = info.instagram_url || "";
-              bizLocation.value = info.location_url || "";
-              bizWorkingHours.value = info.working_hours || "";
-              bizShipping.value = info.shipping_details || "";
-              bizMobiles.value = fromArray(info.mobile_numbers);
-              showBusinessStatus("Loaded business info.");
-            } else {
-              showBusinessStatus(data, true);
-            }
-          } catch (e) {
-            showBusinessStatus("Network error: " + e.message, true);
+        try {
+          const response = await fetch(`/api/business`, {
+            headers,
+          });
+          const data = await response.json();
+          if (response.ok) {
+            const info = data?.data || {};
+            bizName.value = info.name || "";
+            bizWebsite.value = info.website_url || "";
+            bizInstagram.value = info.instagram_url || "";
+            bizLocation.value = info.location_url || "";
+            bizWorkingHours.value = info.working_hours || "";
+            bizShipping.value = info.shipping_details || "";
+            bizMobiles.value = fromArray(info.mobile_numbers);
+            showBusinessStatus("Loaded business info.");
+          } else {
+            showBusinessStatus(data, true);
           }
+        } catch (e) {
+          showBusinessStatus("Network error: " + e.message, true);
         }
       });
     </script>

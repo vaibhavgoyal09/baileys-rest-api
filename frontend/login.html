@@ -196,10 +196,6 @@
     <div class="login-container">
       <h1>Baileys REST API</h1>
 
-      <div class="api-url-group">
-        <label for="api-url">API Server URL:</label>
-        <input type="text" id="api-url" value="http://localhost:3001" />
-      </div>
 
       <div class="tabs">
         <div class="tab active" data-tab="login">Login</div>
@@ -208,21 +204,22 @@
 
       <div class="tab-content active" id="login-tab">
         <div class="form-group">
-          <label for="login-tenant-id">Tenant ID:</label>
+          <label for="login-username">Username or Email:</label>
           <input
             type="text"
-            id="login-tenant-id"
-            placeholder="Enter your tenant ID"
+            id="login-username"
+            placeholder="Enter your username or email"
           />
-          <div class="error" id="login-tenant-error"></div>
+          <div class="error" id="login-username-error"></div>
         </div>
         <div class="form-group">
-          <label for="login-webhook-url">Webhook URL (optional):</label>
+          <label for="login-password">Password:</label>
           <input
-            type="url"
-            id="login-webhook-url"
-            placeholder="https://your-webhook.com"
+            type="password"
+            id="login-password"
+            placeholder="Enter your password"
           />
+          <div class="error" id="login-password-error"></div>
         </div>
         <button id="login-btn">Login</button>
         <div class="error" id="login-error"></div>
@@ -231,23 +228,31 @@
 
       <div class="tab-content" id="register-tab">
         <div class="form-group">
-          <label for="register-tenant-id">Tenant ID:</label>
+          <label for="register-name">Full Name:</label>
           <input
             type="text"
-            id="register-tenant-id"
-            placeholder="Choose a tenant ID"
+            id="register-name"
+            placeholder="Enter your full name"
           />
-          <div class="error" id="register-tenant-error"></div>
+          <div class="error" id="register-name-error"></div>
         </div>
         <div class="form-group">
-          <label for="register-webhook-url">Webhook URL:</label>
+          <label for="register-email">Email Address:</label>
           <input
-            type="url"
-            id="register-webhook-url"
-            placeholder="https://your-webhook.com"
-            required
+            type="email"
+            id="register-email"
+            placeholder="Enter your email address"
           />
-          <div class="error" id="register-webhook-error"></div>
+          <div class="error" id="register-email-error"></div>
+        </div>
+        <div class="form-group">
+          <label for="register-password">Password:</label>
+          <input
+            type="password"
+            id="register-password"
+            placeholder="Choose a password (min 8 chars)"
+          />
+          <div class="error" id="register-password-error"></div>
         </div>
         <button id="register-btn">Register</button>
         <div class="error" id="register-error"></div>
@@ -273,31 +278,26 @@
         });
       });
 
-      // API URL management
-      const apiUrlInput = document.getElementById("api-url");
 
       // Login functionality
       const loginBtn = document.getElementById("login-btn");
-      const loginTenantInput = document.getElementById("login-tenant-id");
-      const loginWebhookInput = document.getElementById("login-webhook-url");
+      const loginUsernameInput = document.getElementById("login-username");
+      const loginPasswordInput = document.getElementById("login-password");
       const loginError = document.getElementById("login-error");
       const loginSuccess = document.getElementById("login-success");
-      const loginTenantError = document.getElementById("login-tenant-error");
+      const loginUsernameError = document.getElementById("login-username-error");
+      const loginPasswordError = document.getElementById("login-password-error");
 
       // Register functionality
       const registerBtn = document.getElementById("register-btn");
-      const registerTenantInput = document.getElementById("register-tenant-id");
-      const registerWebhookInput = document.getElementById(
-        "register-webhook-url",
-      );
+      const registerNameInput = document.getElementById("register-name");
+      const registerEmailInput = document.getElementById("register-email");
+      const registerPasswordInput = document.getElementById("register-password");
       const registerError = document.getElementById("register-error");
       const registerSuccess = document.getElementById("register-success");
-      const registerTenantError = document.getElementById(
-        "register-tenant-error",
-      );
-      const registerWebhookError = document.getElementById(
-        "register-webhook-error",
-      );
+      const registerNameError = document.getElementById("register-name-error");
+      const registerEmailError = document.getElementById("register-email-error");
+      const registerPasswordError = document.getElementById("register-password-error");
 
       function showError(element, message) {
         element.textContent = message;
@@ -317,11 +317,16 @@
 
       // Login handler
       loginBtn.addEventListener("click", async () => {
-        const tenantId = loginTenantInput.value.trim();
-        const webhookUrl = loginWebhookInput.value.trim();
+        const username = loginUsernameInput.value.trim();
+        const password = loginPasswordInput.value.trim();
 
-        if (!tenantId) {
-          showError(loginTenantError, "Tenant ID is required");
+        if (!username) {
+          showError(loginUsernameError, "Username or email is required");
+          return;
+        }
+
+        if (!password || password.length < 8) {
+          showError(loginPasswordError, "Password is required (min 8 characters)");
           return;
         }
 
@@ -329,30 +334,29 @@
         loginBtn.textContent = "Logging in...";
 
         try {
-          const response = await fetch(`${apiUrlInput.value}/api/auth/token`, {
+          const response = await fetch(`/api/auth/login`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              tenantId: tenantId,
-              webhook_url: webhookUrl || null,
+              username,
+              password,
             }),
           });
 
           const data = await response.json();
 
           if (response.ok) {
-            // Store token and tenant info
+            // Store token and user info
             localStorage.setItem("jwtToken", data.token);
-            localStorage.setItem("apiUrl", apiUrlInput.value);
             // Store as global variable for session manager
-            window.currentTenantId = tenantId;
-            localStorage.setItem("tenantId", tenantId);
+            window.currentUsername = data.username;
+            localStorage.setItem("username", data.username);
 
             showSuccess(loginSuccess, "Login successful! Redirecting...");
             setTimeout(() => {
-              window.location.href = "session-manager.html";
+              window.location.href = "index.html";
             }, 1000);
           } else {
             showError(loginError, data.message || "Login failed");
@@ -367,19 +371,22 @@
 
       // Register handler
       registerBtn.addEventListener("click", async () => {
-        const tenantId = registerTenantInput.value.trim();
-        const webhookUrl = registerWebhookInput.value.trim();
+        const name = registerNameInput.value.trim();
+        const email = registerEmailInput.value.trim();
+        const password = registerPasswordInput.value.trim();
 
-        if (!tenantId) {
-          showError(registerTenantError, "Tenant ID is required");
+        if (!name) {
+          showError(registerNameError, "Full name is required");
           return;
         }
 
-        if (!webhookUrl) {
-          showError(
-            registerWebhookError,
-            "Webhook URL is required for registration",
-          );
+        if (!email || !email.includes('@')) {
+          showError(registerEmailError, "Valid email is required");
+          return;
+        }
+
+        if (!password || password.length < 8) {
+          showError(registerPasswordError, "Password is required (min 8 characters)");
           return;
         }
 
@@ -387,33 +394,33 @@
         registerBtn.textContent = "Registering...";
 
         try {
-          const response = await fetch(`${apiUrlInput.value}/api/auth/token`, {
+          const response = await fetch(`/api/auth/register`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              tenantId: tenantId,
-              webhook_url: webhookUrl,
+              name,
+              email,
+              password,
             }),
           });
 
           const data = await response.json();
 
           if (response.ok) {
-            // Store token and tenant info
+            // Store token and user info
             localStorage.setItem("jwtToken", data.token);
-            localStorage.setItem("apiUrl", apiUrlInput.value);
             // Store as global variable for session manager
-            window.currentTenantId = tenantId;
-            localStorage.setItem("tenantId", tenantId);
+            window.currentUsername = data.username;
+            localStorage.setItem("username", data.username);
 
             showSuccess(
               registerSuccess,
               "Registration successful! Redirecting...",
             );
             setTimeout(() => {
-              window.location.href = "session-manager.html";
+              window.location.href = "settings.html";
             }, 1000);
           } else {
             showError(registerError, data.message || "Registration failed");
@@ -429,9 +436,10 @@
       // Check if already logged in
       document.addEventListener("DOMContentLoaded", () => {
         const token = localStorage.getItem("jwtToken");
-        if (token) {
+        const username = localStorage.getItem("username");
+        if (token && username) {
           // Redirect to session manager if already logged in
-          window.location.href = "session-manager.html";
+          window.location.href = "index.html";
         }
       });
     </script>

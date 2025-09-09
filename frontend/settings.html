@@ -242,13 +242,13 @@
       <div class="nav-buttons">
         <button
           class="btn-secondary"
-          onclick="window.location.href='session-manager.html'"
+          onclick="window.location.href='index.html'"
         >
           Session Manager
         </button>
         <button
           class="btn-secondary"
-          onclick="window.location.href='login.html'"
+          onclick="localStorage.clear(); window.location.href='login.html'"
         >
           Logout
         </button>
@@ -256,21 +256,25 @@
     </div>
 
     <div class="container">
-      <div class="form-group">
-        <label for="api-url">API Server URL:</label>
-        <input type="text" id="api-url" value="http://localhost:3001" />
-      </div>
 
       <div class="section">
         <h2>Current User</h2>
         <div id="current-user-info" class="user-card">
           <div class="user-header">
-            <h3 id="current-tenant-name">Loading...</h3>
+            <h3 id="current-header-name">Loading...</h3>
           </div>
           <div class="user-details">
             <div class="detail-item">
-              <div class="detail-label">Tenant ID</div>
-              <div class="detail-value" id="current-tenant-id">-</div>
+              <div class="detail-label">Username</div>
+              <div class="detail-value" id="current-username">-</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">Full Name</div>
+              <div class="detail-value" id="current-full-name">-</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">Email</div>
+              <div class="detail-value" id="current-email">-</div>
             </div>
             <div class="detail-item">
               <div class="detail-label">Webhook URL</div>
@@ -291,6 +295,9 @@
       <div class="section">
         <h2>Update Webhook URL</h2>
         <div class="form-group">
+        <div class="guidance-text">
+          <p><strong>Webhook Configuration:</strong> Configure a webhook URL to receive real-time notifications for incoming WhatsApp messages and events. This is an optional but recommended step after registration to enable automated processing and integrations. You can set it up now or update it later as needed. Enter a valid HTTPS URL where your server listens for POST requests from this API.</p>
+        </div>
           <label for="webhook-url">New Webhook URL:</label>
           <input
             type="url"
@@ -303,19 +310,13 @@
         <div class="success" id="webhook-success"></div>
       </div>
 
-      <div class="section">
-        <h2>All Users</h2>
-        <button id="refresh-users-btn">Refresh Users List</button>
-        <div id="users-list" class="user-list">
-          <p>Click "Refresh Users List" to load users...</p>
-        </div>
-      </div>
     </div>
 
     <script>
-      const apiUrlInput = document.getElementById("api-url");
-      const currentTenantName = document.getElementById("current-tenant-name");
-      const currentTenantId = document.getElementById("current-tenant-id");
+      const currentHeaderName = document.getElementById("current-header-name");
+      const currentFullName = document.getElementById("current-full-name");
+      const currentUsername = document.getElementById("current-username");
+      const currentEmail = document.getElementById("current-email");
       const currentWebhookUrl = document.getElementById("current-webhook-url");
       const currentSessionStatus = document.getElementById(
         "current-session-status",
@@ -365,7 +366,7 @@
         try {
           // Get session status
           const sessionResponse = await fetch(
-            `${apiUrlInput.value}/api/session/status`,
+            `/api/session/status`,
             { headers },
           );
           const sessionData = await sessionResponse.json();
@@ -376,18 +377,20 @@
               sessionData.status === "connected" ? "var(--success)" : "var(--error)";
           }
 
-          // Get business info (which includes user config)
-          const businessResponse = await fetch(
-            `${apiUrlInput.value}/api/business`,
+          // Get user info
+          const userResponse = await fetch(
+            `/api/auth/user`,
             { headers },
           );
-          const businessData = await businessResponse.json();
+          const userData = await userResponse.json();
+          console.log('User response:', userData); // Debug log
 
-          if (businessResponse.ok) {
-            const userConfig = businessData.data || {};
-            currentTenantName.textContent =
-              userConfig.name || "No business name set";
-            currentWebhookUrl.textContent = userConfig.webhook_url || "Not set";
+          if (userResponse.ok) {
+            const user = userData.user || {};
+            currentHeaderName.textContent = user.name || "No name set";
+            currentFullName.textContent = user.name || "No name set";
+            currentEmail.textContent = user.email || "No email set";
+            currentWebhookUrl.textContent = user.webhookUrl || "Not set";
           }
         } catch (error) {
           console.error("Error loading user info:", error);
@@ -410,7 +413,7 @@
 
         try {
           const response = await fetch(
-            `${apiUrlInput.value}/api/business/webhook`,
+            `/api/auth/webhook`,
             {
               method: "PUT",
               headers,
@@ -434,44 +437,19 @@
         updateWebhookBtn.textContent = "Update Webhook";
       });
 
-      // Load all users (admin functionality - this would require admin privileges)
-      refreshUsersBtn.addEventListener("click", async () => {
-        const headers = getAuthHeaders();
-        if (!headers) return;
-
-        refreshUsersBtn.disabled = true;
-        refreshUsersBtn.textContent = "Loading...";
-
-        try {
-          // Note: This endpoint would need to be implemented on the backend
-          // For now, we'll just show a message
-          usersList.innerHTML =
-            "<p>User list functionality requires backend implementation with admin privileges.</p>";
-        } catch (error) {
-          usersList.innerHTML = `<p class="error">Error loading users: ${error.message}</p>`;
-        }
-
-        refreshUsersBtn.disabled = false;
-        refreshUsersBtn.textContent = "Refresh Users List";
-      });
 
       // Initialize page
       document.addEventListener("DOMContentLoaded", () => {
         const token = localStorage.getItem("jwtToken");
-        const tenantId = localStorage.getItem("tenantId");
-        const savedApiUrl = localStorage.getItem("apiUrl");
+        const username = localStorage.getItem("username");
 
-        if (!token || !tenantId) {
+        if (!token || !username) {
           alert("Please login first");
           window.location.href = "login.html";
           return;
         }
 
-        if (savedApiUrl) {
-          apiUrlInput.value = savedApiUrl;
-        }
-
-        currentTenantId.textContent = tenantId;
+        currentUsername.textContent = username;
         currentCreatedAt.textContent = new Date().toLocaleString();
 
         loadCurrentUserInfo();

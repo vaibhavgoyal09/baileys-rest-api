@@ -1,7 +1,7 @@
 import { logger, errorLogger } from "../utils/logger.js";
 import prisma from "./prisma.js";
 
-export type TenantId = string;
+export type Username = string;
 
 type UpsertUserConfig = {
   webhook_url?: string | null;
@@ -22,50 +22,55 @@ class PrismaConfigStore {
     logger.info("Prisma config store initialized");
   }
 
-  async ensureTenant(tenantId: TenantId): Promise<void> {
+  async ensureTenant(username: Username): Promise<void> {
     try {
       await prisma.user.upsert({
-        where: { tenantId },
+        where: { username },
         update: {},
-        create: { tenantId },
+        create: {
+          username,
+          name: username, // Use username as default name
+          email: `${username}@bootstrap.local`, // Placeholder email
+          hashedPassword: '' // Bootstrap users without password
+        },
       });
 
       await prisma.businessInfoTenant.upsert({
-        where: { tenantId },
+        where: { username },
         update: {},
-        create: { tenantId },
+        create: { username },
       });
     } catch (e) {
       errorLogger.error({
         msg: "ensureTenant failed",
-        tenantId,
+        username,
         error: (e as Error)?.message || e,
       });
     }
   }
 
-  async getWebhookUrl(tenantId: TenantId): Promise<string | null> {
+  async getWebhookUrl(username: Username): Promise<string | null> {
     try {
       const user = await prisma.user.findUnique({
-        where: { tenantId },
+        where: { username },
         select: { webhookUrl: true },
       });
       return user?.webhookUrl || null;
     } catch (e) {
       errorLogger.error({
         msg: "getWebhookUrl failed",
-        tenantId,
+        username,
         error: (e as Error)?.message || e,
       });
       return null;
     }
   }
 
-  async upsertUserConfig(tenantId: TenantId, cfg: UpsertUserConfig): Promise<void> {
+  async upsertUserConfig(username: Username, cfg: UpsertUserConfig): Promise<void> {
     try {
-      await this.ensureTenant(tenantId);
+      await this.ensureTenant(username);
       await prisma.user.update({
-        where: { tenantId },
+        where: { username },
         data: {
           webhookUrl: cfg.webhook_url ?? null,
         },
@@ -73,18 +78,18 @@ class PrismaConfigStore {
     } catch (e) {
       errorLogger.error({
         msg: "upsertUserConfig failed",
-        tenantId,
+        username,
         error: (e as Error)?.message || e,
       });
     }
   }
 
   async getBusinessInfo(
-    tenantId: TenantId,
+    username: Username,
   ): Promise<Required<BusinessInfo> & { last_updated: number | null }> {
     try {
       const businessInfo = await prisma.businessInfoTenant.findUnique({
-        where: { tenantId },
+        where: { username },
       });
 
       if (!businessInfo) {
@@ -115,7 +120,7 @@ class PrismaConfigStore {
     } catch (e) {
       errorLogger.error({
         msg: "getBusinessInfo failed",
-        tenantId,
+        username,
         error: (e as Error)?.message || e,
       });
       return {
@@ -131,10 +136,10 @@ class PrismaConfigStore {
     }
   }
 
-  async setBusinessInfo(tenantId: TenantId, info: BusinessInfo): Promise<void> {
+  async setBusinessInfo(username: Username, info: BusinessInfo): Promise<void> {
     try {
-      await this.ensureTenant(tenantId);
-      const current = await this.getBusinessInfo(tenantId);
+      await this.ensureTenant(username);
+      const current = await this.getBusinessInfo(username);
 
       const merged: Required<BusinessInfo> = {
         name: info.name !== undefined ? info.name : current.name,
@@ -165,7 +170,7 @@ class PrismaConfigStore {
       };
 
       await prisma.businessInfoTenant.update({
-        where: { tenantId },
+        where: { username },
         data: {
           name: merged.name ?? null,
           workingHours: merged.working_hours ?? null,
@@ -181,7 +186,7 @@ class PrismaConfigStore {
     } catch (e) {
       errorLogger.error({
         msg: "setBusinessInfo failed",
-        tenantId,
+        username,
         error: (e as Error)?.message || e,
       });
     }

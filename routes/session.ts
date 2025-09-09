@@ -24,8 +24,8 @@ router.post(
   verifyToken,
   async (req: Request, res: Response): Promise<void> => {
     try {
-      const tenantId = (req as any).user?.userId as string;
-      const result = await WAManager.initialize(tenantId);
+      const username = (req as any).user?.userId as string;
+      const result = await WAManager.initialize(username);
 
       if (!result.success) {
         (res as any).sendError(500, result);
@@ -53,8 +53,8 @@ router.get(
   verifyToken,
   async (req: Request, res: Response): Promise<void> => {
     try {
-      const tenantId = (req as any).user?.userId as string;
-      const status = WAManager.getConnectionStatus(tenantId);
+      const username = (req as any).user?.userId as string;
+      const status = WAManager.getConnectionStatus(username);
 
       if (status.qr) {
         status.qrBase64 = await generateQRBase64(status.qr);
@@ -75,8 +75,8 @@ router.post(
   verifyToken,
   async (req: Request, res: Response): Promise<void> => {
     try {
-      const tenantId = (req as any).user?.userId as string;
-      const result = await WAManager.logout(tenantId);
+      const username = (req as any).user?.userId as string;
+      const result = await WAManager.logout(username);
       if (result.success) {
         (res as any).sendResponse(200, result);
       } else {
