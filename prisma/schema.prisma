@@ -52,16 +52,32 @@ model BusinessInfo {
   @@map("business_info")
 }
 
+// Webhook configuration
+model Webhook {
+  id          String   @id @default(cuid())
+  url         String
+  username    String
+  name        String?  // Optional name for the webhook
+  secret      String   // Secret key for webhook signature verification
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now()) @db.Timestamp(6)
+  updatedAt   DateTime @default(now()) @updatedAt @db.Timestamp(6)
+  user        User     @relation(fields: [username], references: [username], onDelete: Cascade)
+
+  @@map("webhooks")
+}
+
 // Tenant/User configuration
 model User {
   username      String             @id
   name          String
   email         String             @unique
   hashedPassword String
-  webhookUrl    String?
+  webhookUrl    String?            // Keep for backward compatibility, but will be deprecated
   createdAt     DateTime           @default(now()) @db.Timestamp(6)
   updatedAt     DateTime           @default(now()) @updatedAt @db.Timestamp(6)
   businessInfo  BusinessInfoTenant?
+  webhooks      Webhook[]
 
   @@map("users")
 }

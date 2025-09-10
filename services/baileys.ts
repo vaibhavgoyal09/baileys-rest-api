@@ -402,7 +402,7 @@ class WhatsAppService {
 
       this.sock.ev.on("contacts.upsert", async (contacts: any) => {
         try {
-          for (const c of (contacts || [])) {
+          for (const c of contacts || []) {
             const jid = c.id || c.jid;
             if (!jid) continue;
             const name = c.name || c.notify || c.pushName || null;
@@ -426,7 +426,7 @@ class WhatsAppService {
           type: m.type,
           messageCount: m.messages ? m.messages.length : 0,
         });
-      
+
         if (m.type === "notify") {
           try {
             await Promise.all(
@@ -436,13 +436,13 @@ class WhatsAppService {
                 if (messageType === "protocolMessage") {
                   return;
                 }
-      
+
                 // Debug log for raw message
                 console.log({
                   msg: "Raw message received",
                   data: msg,
                 });
-      
+
                 // Extract relevant message information
                 const messageInfo: MessageInfo = {
                   id: msg.key.id,
@@ -454,13 +454,13 @@ class WhatsAppService {
                   content: WhatsAppService.extractMessageContent(msg),
                   isGroup: msg.key.remoteJid?.endsWith("@g.us") || false,
                 };
-      
+
                 // Debug log for processed message
                 logger.debug({
                   msg: "Processed message info",
                   data: messageInfo,
                 });
-      
+
                 // Enqueue to ingestion service
                 try {
                   const res = await ingestion.enqueueMessage(messageInfo);
@@ -484,7 +484,7 @@ class WhatsAppService {
                     error: (e as Error)?.message || e,
                   });
                 }
-      
+
                 // Send to webhook with business details
                 const businessInfo = await Store.getBusinessInfo();
                 await WhatsAppService.notifyWebhook("message.received", {
@@ -1002,7 +1002,7 @@ class WhatsAppService {
     }
     try {
       const conversations =
-        await Store.listConversations({ limit: 1000, cursor: null }) || [];
+        (await Store.listConversations({ limit: 1000, cursor: null })) || [];
       logger.info({
         msg: "Starting history backfill on reconnect",
         chatCount: conversations.length,

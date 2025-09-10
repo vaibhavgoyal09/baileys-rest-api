@@ -26,13 +26,17 @@ router.post(
     try {
       const { username, webhook_url } = req.body || {};
 
-      if (webhook_url !== undefined) {
-        await ConfigStore.upsertUserConfig(username, {
-          webhook_url: webhook_url ?? null,
+      // Ensure user exists
+      await ConfigStore.ensureTenant(username);
+
+      // Handle legacy webhook_url parameter for backward compatibility
+      if (webhook_url !== undefined && webhook_url !== null) {
+        // Create a webhook entry for the legacy webhook_url
+        await ConfigStore.addWebhook(username, {
+          url: webhook_url,
+          name: "Legacy Webhook",
+          isActive: true,
         });
-      } else {
-        // ensure user exists
-        await ConfigStore.upsertUserConfig(username, { webhook_url: null });
       }
 
       const token = signJwt({ userId: username });
@@ -41,7 +45,7 @@ router.post(
         token,
         token_type: "Bearer",
         username,
-        webhook_url: await ConfigStore.getWebhookUrl(username),
+        webhook_url: await ConfigStore.getWebhookUrl(username), // Returns first active webhook for backward compatibility
       });
     } catch (error) {
       (res as any).sendError(500, error);
@@ -70,7 +74,7 @@ router.post(
       }
 
       // Generate unique username
-      let username = `${email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '')}${crypto.randomBytes(4).toString('hex')}`;
+      let username = `${email.split("@")[0].replace(/[^a-zA-Z0-9]/g, "")}${crypto.randomBytes(4).toString("hex")}`;
       let existingUser = await prisma.user.findUnique({
         where: { username },
       });
@@ -78,7 +82,7 @@ router.post(
       // Retry if username exists (unlikely but possible)
       let attempts = 0;
       while (existingUser && attempts < 5) {
-        username = `${email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '')}${crypto.randomBytes(4).toString('hex')}`;
+        username = `${email.split("@")[0].replace(/[^a-zA-Z0-9]/g, "")}${crypto.randomBytes(4).toString("hex")}`;
         existingUser = await prisma.user.findUnique({
           where: { username },
         });
@@ -86,7 +90,9 @@ router.post(
       }
 
       if (existingUser) {
-        (res as any).sendError(500, { message: "Failed to generate unique username" });
+        (res as any).sendError(500, {
+          message: "Failed to generate unique username",
+        });
         return;
       }
 
@@ -107,17 +113,18 @@ router.post(
       });
 
       const token = signJwt({ userId: username });
+      const webhooks = await ConfigStore.getWebhooks(username);
       (res as any).sendResponse(201, {
         success: true,
         token,
         token_type: "Bearer",
         username,
-        webhook_url: null,
+        webhooks: webhooks,
       });
     } catch (error) {
       (res as any).sendError(500, error);
     }
-  }
+  },
 );
 
 router.post(
@@ -134,7 +141,7 @@ router.post(
       });
 
       // If not found and input looks like email, try finding by email
-      if (!user && loginInput.includes('@')) {
+      if (!user && loginInput.includes("@")) {
         user = await prisma.user.findUnique({
           where: { email: loginInput },
           select: { username: true, hashedPassword: true } as any,
@@ -149,7 +156,10 @@ router.post(
         return;
       }
 
-      const isPasswordValid = await bcrypt.compare(password, (user as any)?.hashedPassword || '');
+      const isPasswordValid = await bcrypt.compare(
+        password,
+        (user as any)?.hashedPassword || "",
+      );
 
       if (!isPasswordValid) {
         (res as any).sendResponse(401, {
@@ -161,66 +171,380 @@ router.post(
 
       const actualUsername = (user as any).username;
       const token = signJwt({ userId: actualUsername });
+      const webhooks = await ConfigStore.getWebhooks(actualUsername);
       (res as any).sendResponse(200, {
         success: true,
         token,
         token_type: "Bearer",
         username: actualUsername,
-        webhook_url: await ConfigStore.getWebhookUrl(actualUsername),
+        webhooks: webhooks,
       });
     } catch (error) {
       (res as any).sendError(500, error);
     }
-  }
+  },
 );
 
-router.get(
-  "/user",
+router.get("/user", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      (res as any).sendResponse(401, {
+        success: false,
+        message: "Unauthorized",
+      });
+      return;
+    }
+
+    const token = authHeader.split(" ")[1];
+    if (!token) {
+      (res as any).sendResponse(401, {
+        success: false,
+        message: "Invalid token",
+      });
+      return;
+    }
+    const payload = verifyJwt(token);
+    const username = payload.userId;
+
+    const user = await prisma.user.findUnique({
+      where: { username },
+      select: {
+        name: true,
+        email: true,
+        createdAt: true,
+      },
+    });
+
+    if (!user) {
+      (res as any).sendResponse(404, {
+        success: false,
+        message: "User not found",
+      });
+      return;
+    }
+
+    const webhooks = await ConfigStore.getWebhooks(username);
+
+    (res as any).sendResponse(200, {
+      success: true,
+      user: {
+        name: user.name || "No name set",
+        email: user.email || "No email set",
+        webhooks: webhooks,
+        createdAt: user.createdAt.toLocaleString(),
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching user info:", error);
+    (res as any).sendError(500, { message: "Internal server error" });
+  }
+});
+
+// Webhook management endpoints
+router.get("/webhooks", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      (res as any).sendResponse(401, {
+        success: false,
+        message: "Unauthorized",
+      });
+      return;
+    }
+
+    const token = authHeader.split(" ")[1];
+    if (!token) {
+      (res as any).sendResponse(401, {
+        success: false,
+        message: "Invalid token",
+      });
+      return;
+    }
+    const payload = verifyJwt(token);
+    const username = payload.userId;
+
+    const webhooks = await ConfigStore.getWebhooks(username);
+    (res as any).sendResponse(200, {
+      success: true,
+      webhooks,
+    });
+  } catch (error) {
+    (res as any).sendError(500, { message: "Internal server error" });
+  }
+});
+
+router.post("/webhooks", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      (res as any).sendResponse(401, {
+        success: false,
+        message: "Unauthorized",
+      });
+      return;
+    }
+
+    const token = authHeader.split(" ")[1];
+    if (!token) {
+      (res as any).sendResponse(401, {
+        success: false,
+        message: "Invalid token",
+      });
+      return;
+    }
+    const payload = verifyJwt(token);
+    const username = payload.userId;
+
+    const { url, name, isActive } = req.body;
+
+    if (!url) {
+      (res as any).sendResponse(400, {
+        success: false,
+        message: "URL is required",
+      });
+      return;
+    }
+
+    const webhookId = await ConfigStore.addWebhook(username, {
+      url,
+      name: name || null,
+      isActive: isActive ?? true,
+    });
+
+    if (!webhookId) {
+      (res as any).sendResponse(500, {
+        success: false,
+        message: "Failed to add webhook",
+      });
+      return;
+    }
+
+    (res as any).sendResponse(201, {
+      success: true,
+      webhook: {
+        id: webhookId,
+        url,
+        name: name || null,
+        isActive: isActive ?? true,
+      },
+    });
+  } catch (error) {
+    (res as any).sendError(500, { message: "Internal server error" });
+  }
+});
+
+router.put(
+  "/webhooks/:id",
   async (req: Request, res: Response): Promise<void> => {
     try {
       const authHeader = req.headers.authorization;
       if (!authHeader || !authHeader.startsWith("Bearer ")) {
-        (res as any).sendResponse(401, { success: false, message: "Unauthorized" });
+        (res as any).sendResponse(401, {
+          success: false,
+          message: "Unauthorized",
+        });
         return;
       }
 
       const token = authHeader.split(" ")[1];
       if (!token) {
-        (res as any).sendResponse(401, { success: false, message: "Invalid token" });
+        (res as any).sendResponse(401, {
+          success: false,
+          message: "Invalid token",
+        });
         return;
       }
       const payload = verifyJwt(token);
       const username = payload.userId;
 
-      const user = await prisma.user.findUnique({
-        where: { username },
-        select: {
-          name: true,
-          email: true,
-          webhookUrl: true,
-          createdAt: true,
-        },
+      const { id } = req.params;
+      const { url, name, isActive } = req.body;
+
+      if (!id) {
+        (res as any).sendResponse(400, {
+          success: false,
+          message: "Webhook ID is required",
+        });
+        return;
+      }
+
+      const success = await ConfigStore.updateWebhook(username, id, {
+        url,
+        name,
+        isActive,
       });
 
-      if (!user) {
-        (res as any).sendResponse(404, { success: false, message: "User not found" });
+      if (!success) {
+        (res as any).sendResponse(404, {
+          success: false,
+          message: "Webhook not found",
+        });
         return;
       }
 
       (res as any).sendResponse(200, {
         success: true,
-        user: {
-          name: user.name || "No name set",
-          email: user.email || "No email set",
-          webhookUrl: user.webhookUrl || "Not set",
-          createdAt: user.createdAt.toLocaleString(),
+        message: "Webhook updated successfully",
+      });
+    } catch (error) {
+      (res as any).sendError(500, { message: "Internal server error" });
+    }
+  },
+);
+
+router.delete(
+  "/webhooks/:id",
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        (res as any).sendResponse(401, {
+          success: false,
+          message: "Unauthorized",
+        });
+        return;
+      }
+
+      const token = authHeader.split(" ")[1];
+      if (!token) {
+        (res as any).sendResponse(401, {
+          success: false,
+          message: "Invalid token",
+        });
+        return;
+      }
+      const payload = verifyJwt(token);
+      const username = payload.userId;
+
+      const { id } = req.params;
+
+      if (!id) {
+        (res as any).sendResponse(400, {
+          success: false,
+          message: "Webhook ID is required",
+        });
+        return;
+      }
+
+      const success = await ConfigStore.deleteWebhook(username, id);
+
+      if (!success) {
+        (res as any).sendResponse(404, {
+          success: false,
+          message: "Webhook not found",
+        });
+        return;
+      }
+
+      (res as any).sendResponse(200, {
+        success: true,
+        message: "Webhook deleted successfully",
+      });
+    } catch (error) {
+      (res as any).sendError(500, { message: "Internal server error" });
+    }
+  },
+);
+
+// Get current user's API key (JWT token)
+router.get("/api-key", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      (res as any).sendResponse(401, {
+        success: false,
+        message: "Unauthorized",
+      });
+      return;
+    }
+
+    const token = authHeader.split(" ")[1];
+    if (!token) {
+      (res as any).sendResponse(401, {
+        success: false,
+        message: "Invalid token",
+      });
+      return;
+    }
+
+    // Verify the token is valid
+    const payload = verifyJwt(token);
+    const username = payload.userId;
+
+    // Generate a fresh token to ensure it's current
+    const freshToken = signJwt({ userId: username });
+
+    (res as any).sendResponse(200, {
+      success: true,
+      api_key: freshToken,
+      token_type: "Bearer",
+      username: username,
+    });
+  } catch (error) {
+    console.error("Error getting API key:", error);
+    (res as any).sendError(500, { message: "Internal server error" });
+  }
+});
+
+// Get webhook secret for verification
+router.get(
+  "/webhooks/:id/secret",
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        (res as any).sendResponse(401, {
+          success: false,
+          message: "Unauthorized",
+        });
+        return;
+      }
+
+      const token = authHeader.split(" ")[1];
+      if (!token) {
+        (res as any).sendResponse(401, {
+          success: false,
+          message: "Invalid token",
+        });
+        return;
+      }
+      const payload = verifyJwt(token);
+      const username = payload.userId;
+
+      const { id } = req.params;
+
+      if (!id) {
+        (res as any).sendResponse(400, {
+          success: false,
+          message: "Webhook ID is required",
+        });
+        return;
+      }
+
+      // Get all webhooks and find the specific one
+      const webhooks = await ConfigStore.getWebhooks(username);
+      const webhook = webhooks.find((w) => w.id === id);
+
+      if (!webhook) {
+        (res as any).sendResponse(404, {
+          success: false,
+          message: "Webhook not found",
+        });
+        return;
+      }
+
+      (res as any).sendResponse(200, {
+        success: true,
+        webhook: {
+          id: webhook.id,
+          secret: webhook.secret,
         },
       });
     } catch (error) {
-      console.error("Error fetching user info:", error);
       (res as any).sendError(500, { message: "Internal server error" });
     }
-  }
+  },
 );
 
 export default router;

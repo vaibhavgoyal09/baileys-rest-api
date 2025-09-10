@@ -9,6 +9,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { pino } from "pino";
 import fs from "fs/promises";
+import crypto from "crypto";
 import { logger, errorLogger } from "../utils/logger.js";
 import Store from "./prismaStore.js";
 import ingestion from "./ingestion.js";
@@ -359,7 +360,7 @@ class TenantSession {
 
       this.sock.ev.on("contacts.upsert", async (contacts: any) => {
         try {
-          for (const c of (contacts || [])) {
+          for (const c of contacts || []) {
             const jid = c.id || c.jid;
             if (!jid) continue;
             const name = c.name || c.notify || c.pushName || null;
@@ -381,14 +382,14 @@ class TenantSession {
           messageCount: m.messages ? m.messages.length : 0,
           username: this.username,
         });
-      
+
         if (m.type === "notify") {
           try {
             await Promise.all(
               m.messages.map(async (msg: any) => {
                 const messageType = Object.keys(msg.message || {})[0] || "";
                 if (messageType === "protocolMessage") return;
-      
+
                 const messageInfo: MessageInfo = {
                   id: msg.key.id,
                   from: msg.key.remoteJid,
@@ -399,7 +400,7 @@ class TenantSession {
                   content: TenantManager.extractMessageContent(msg),
                   isGroup: msg.key.remoteJid?.endsWith("@g.us") || false,
                 };
-      
+
                 try {
                   const res = await ingestion.enqueueMessage(messageInfo);
                   logger.info({
@@ -425,8 +426,10 @@ class TenantSession {
                     username: this.username,
                   });
                 }
-      
-                const businessInfo = await ConfigStore.getBusinessInfo(this.username);
+
+                const businessInfo = await ConfigStore.getBusinessInfo(
+                  this.username,
+                );
                 await TenantManager.notifyWebhook(
                   this.username,
                   "message.received",
@@ -676,7 +679,11 @@ class TenantSession {
             }
 
             // Ensure it's a reasonable phone number length (7-15 digits)
-            if (digits.length >= 7 && digits.length <= 15 && !nums.includes(digits)) {
+            if (
+              digits.length >= 7 &&
+              digits.length <= 15 &&
+              !nums.includes(digits)
+            ) {
               nums.push(digits);
             }
           }
@@ -929,41 +936,120 @@ class TenantManager {
     event: string,
     data: any,
   ): Promise<void> {
-    const webhookUrl = await ConfigStore.getWebhookUrl(username);
-    console.log("Checking webhook URL for user:", username, "event:", event, "webhookUrl:", webhookUrl ? "configured" : "not configured");
-    if (!webhookUrl) {
-      console.log("Webhook URL not configured, skipping notification for event:", event, "username:", username);
-      return;
-    }
-
-    console.log("Sending webhook notification for event:", event, "to URL:", webhookUrl);
     try {
-      const response = await fetch(webhookUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "User-Agent": "Baileys-API-Webhook",
-          "X-Event-Type": event,
-          "X-Username": username,
-        },
-        body: JSON.stringify({
-          event,
-          username,
-          timestamp: new Date().toISOString(),
-          data,
-        }),
-      });
+      const webhooks = await ConfigStore.getWebhooks(username);
+      const activeWebhooks = webhooks.filter((w) => w.isActive);
 
-      if (!response.ok) {
-        console.log("Webhook request failed with status:", response.status, response.statusText);
-        throw new Error(
-          `Webhook request failed with status ${response.status}: ${response.statusText}`,
+      console.log(
+        "Checking webhooks for user:",
+        username,
+        "event:",
+        event,
+        "active webhooks:",
+        activeWebhooks.length,
+      );
+
+      if (activeWebhooks.length === 0) {
+        console.log(
+          "No active webhooks configured, skipping notification for event:",
+          event,
+          "username:",
+          username,
         );
+        return;
       }
 
-      console.log("Webhook notification sent successfully for event:", event, "status:", response.status);
+      // Send notifications to all active webhooks asynchronously
+      const notificationPromises = activeWebhooks.map(async (webhook) => {
+        console.log(
+          "Sending webhook notification for event:",
+          event,
+          "to URL:",
+          webhook.url,
+          "name:",
+          webhook.name || "unnamed",
+        );
+
+        try {
+          const payload = JSON.stringify({
+            event,
+            username,
+            timestamp: new Date().toISOString(),
+            data,
+            webhook: {
+              id: webhook.id,
+              name: webhook.name,
+              url: webhook.url,
+            },
+          });
+
+          // Generate HMAC signature using webhook secret
+          const signature = crypto
+            .createHmac('sha256', webhook.secret || '')
+            .update(payload)
+            .digest('hex');
+
+          const response = await fetch(webhook.url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "User-Agent": "Baileys-API-Webhook",
+              "X-Event-Type": event,
+              "X-Username": username,
+              "X-Webhook-Id": webhook.id || "",
+              "X-Webhook-Name": webhook.name || "",
+              "X-Signature": `sha256=${signature}`,
+            },
+            body: payload,
+          });
+
+          if (!response.ok) {
+            console.log(
+              "Webhook request failed for",
+              webhook.url,
+              "status:",
+              response.status,
+              response.statusText,
+            );
+            throw new Error(
+              `Webhook request failed with status ${response.status}: ${response.statusText}`,
+            );
+          }
+
+          console.log(
+            "Webhook notification sent successfully for event:",
+            event,
+            "to:",
+            webhook.url,
+            "status:",
+            response.status,
+          );
+        } catch (error: any) {
+          console.log(
+            "Error during webhook notification:",
+            event,
+            "username:",
+            username,
+            "webhook:",
+            webhook.url,
+            "error:",
+            error.message,
+          );
+          // Don't throw error to avoid failing other webhooks
+        }
+      });
+
+      // Wait for all notifications to complete (but don't fail if some fail)
+      await Promise.allSettled(notificationPromises);
     } catch (error: any) {
-      console.log("Error during webhook notification:", event, "username:", username, "error:", error.message);
+      console.log(
+        "Error getting webhooks for notification:",
+        event,
+        "username:",
+        username,
+        "error:",
+        error.message,
+      );
     }
   }
 

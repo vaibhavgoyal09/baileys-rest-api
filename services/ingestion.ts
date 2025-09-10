@@ -306,9 +306,7 @@ class IngestionService {
     this.installShutdownHooks();
   }
 
-  async enqueueMessage(
-    msg: MessageInfo,
-  ): Promise<{
+  async enqueueMessage(msg: MessageInfo): Promise<{
     accepted: boolean;
     reason?: string;
     idempotencyKey: string;
@@ -444,13 +442,29 @@ class IngestionService {
     records: IngestRecord[],
   ) {
     const started = nowMs();
-    console.log("Starting batch persistence - worker:", workerId, "batchSize:", records.length, "sampleMessageId:", records[0]?.payload?.id);
+    console.log(
+      "Starting batch persistence - worker:",
+      workerId,
+      "batchSize:",
+      records.length,
+      "sampleMessageId:",
+      records[0]?.payload?.id,
+    );
     try {
       await this.persistBatchSplitOnFailure(records, 0);
       const took = nowMs() - started;
       this.metrics.observeLatency(took);
       this.metrics.persisted += records.length;
-      console.log("Successfully persisted batch - worker:", workerId, "size:", records.length, "tookMs:", took, "sampleMessageId:", records[0]?.payload?.id);
+      console.log(
+        "Successfully persisted batch - worker:",
+        workerId,
+        "size:",
+        records.length,
+        "tookMs:",
+        took,
+        "sampleMessageId:",
+        records[0]?.payload?.id,
+      );
     } catch (e: any) {
       // Should not reach here; failures are handled with DLQ inside persistBatchSplitOnFailure
       console.log("Unhandled persistBatchWithRetry error:", e?.message || e);

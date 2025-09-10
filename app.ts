@@ -1,7 +1,7 @@
 import "dotenv/config";
 import express, { Application, Request, Response, NextFunction } from "express";
 import cors from "cors";
-import path from 'path';
+import path from "path";
 
 // Error Handler
 import errorHandler from "./middlewares/errorHandler.js";
@@ -48,7 +48,9 @@ const corsOptions = {
   preflightContinue: false,
   optionsSuccessStatus: 204,
 };
-app.use(express.static(path.join(process.cwd(), 'frontend'), { index: 'index.html' }));
+app.use(
+  express.static(path.join(process.cwd(), "frontend"), { index: "index.html" }),
+);
 app.use(cors(corsOptions));
 
 // Routes
@@ -93,7 +95,7 @@ app.get("/metrics", (req: Request, res: Response): void => {
 
 // 404
 app.use((req: Request, res: Response) => {
-  res.status(404).send('<h1>404 Not Found</h1>');
+  res.status(404).send("<h1>404 Not Found</h1>");
 });
 
 const HOST = process.env.HOST || "localhost";

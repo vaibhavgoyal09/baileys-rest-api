@@ -1,10 +1,19 @@
 import { logger, errorLogger } from "../utils/logger.js";
 import prisma from "./prisma.js";
+import crypto from "crypto";
 
 export type Username = string;
 
 type UpsertUserConfig = {
   webhook_url?: string | null;
+};
+
+type WebhookData = {
+  id?: string;
+  url: string;
+  name?: string | null;
+  secret?: string;
+  isActive?: boolean;
 };
 
 type BusinessInfo = {
@@ -31,7 +40,7 @@ class PrismaConfigStore {
           username,
           name: username, // Use username as default name
           email: `${username}@bootstrap.local`, // Placeholder email
-          hashedPassword: '' // Bootstrap users without password
+          hashedPassword: "", // Bootstrap users without password
         },
       });
 
@@ -51,6 +60,14 @@ class PrismaConfigStore {
 
   async getWebhookUrl(username: Username): Promise<string | null> {
     try {
+      // First try to get from new webhooks table
+      const webhooks = await this.getWebhooks(username);
+      const activeWebhook = webhooks.find((w) => w.isActive);
+      if (activeWebhook) {
+        return activeWebhook.url;
+      }
+
+      // Fallback to legacy webhookUrl field for backward compatibility
       const user = await prisma.user.findUnique({
         where: { username },
         select: { webhookUrl: true },
@@ -66,7 +83,114 @@ class PrismaConfigStore {
     }
   }
 
-  async upsertUserConfig(username: Username, cfg: UpsertUserConfig): Promise<void> {
+  async getWebhooks(username: Username): Promise<WebhookData[]> {
+    try {
+      await this.ensureTenant(username);
+      const webhooks = await prisma.webhook.findMany({
+        where: { username },
+        orderBy: { createdAt: "asc" },
+      });
+      return webhooks.map((w) => ({
+        id: w.id,
+        url: w.url,
+        name: w.name,
+        secret: w.secret,
+        isActive: w.isActive,
+      }));
+    } catch (e) {
+      errorLogger.error({
+        msg: "getWebhooks failed",
+        username,
+        error: (e as Error)?.message || e,
+      });
+      return [];
+    }
+  }
+
+  async addWebhook(
+    username: Username,
+    webhookData: Omit<WebhookData, "id">,
+  ): Promise<string | null> {
+    try {
+      await this.ensureTenant(username);
+      // Generate a random secret for webhook verification
+      const secret = webhookData.secret || crypto.randomBytes(32).toString('hex');
+
+      const webhook = await prisma.webhook.create({
+        data: {
+          url: webhookData.url,
+          username,
+          name: webhookData.name || null,
+          secret,
+          isActive: webhookData.isActive ?? true,
+        },
+      });
+      return webhook.id;
+    } catch (e) {
+      errorLogger.error({
+        msg: "addWebhook failed",
+        username,
+        error: (e as Error)?.message || e,
+      });
+      return null;
+    }
+  }
+
+  async updateWebhook(
+    username: Username,
+    webhookId: string,
+    webhookData: Partial<WebhookData>,
+  ): Promise<boolean> {
+    try {
+      const updateData: any = {};
+      if (webhookData.url !== undefined) updateData.url = webhookData.url;
+      if (webhookData.name !== undefined) updateData.name = webhookData.name;
+      if (webhookData.isActive !== undefined)
+        updateData.isActive = webhookData.isActive;
+
+      await prisma.webhook.updateMany({
+        where: {
+          id: webhookId,
+          username,
+        },
+        data: updateData,
+      });
+      return true;
+    } catch (e) {
+      errorLogger.error({
+        msg: "updateWebhook failed",
+        username,
+        webhookId,
+        error: (e as Error)?.message || e,
+      });
+      return false;
+    }
+  }
+
+  async deleteWebhook(username: Username, webhookId: string): Promise<boolean> {
+    try {
+      await prisma.webhook.deleteMany({
+        where: {
+          id: webhookId,
+          username,
+        },
+      });
+      return true;
+    } catch (e) {
+      errorLogger.error({
+        msg: "deleteWebhook failed",
+        username,
+        webhookId,
+        error: (e as Error)?.message || e,
+      });
+      return false;
+    }
+  }
+
+  async upsertUserConfig(
+    username: Username,
+    cfg: UpsertUserConfig,
+  ): Promise<void> {
     try {
       await this.ensureTenant(username);
       await prisma.user.update({
@@ -115,7 +239,9 @@ class PrismaConfigStore {
         mobile_numbers: businessInfo.mobileNumbers
           ? JSON.parse(businessInfo.mobileNumbers)
           : null,
-        last_updated: businessInfo.lastUpdated ? businessInfo.lastUpdated.getTime() : null,
+        last_updated: businessInfo.lastUpdated
+          ? businessInfo.lastUpdated.getTime()
+          : null,
       };
     } catch (e) {
       errorLogger.error({

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -485,45 +485,45 @@
         .grid-2 {
           grid-template-columns: 1fr;
         }
-      
+
         .btn-row {
           flex-direction: column;
         }
-      
+
         .action-buttons {
           flex-direction: column;
         }
-      
+
         .section {
           padding: 1rem;
         }
-      
+
         .qr-layout {
           flex-direction: column;
         }
-      
+
         .qr-code-container {
           max-width: 100%;
         }
-      
+
         .connection-steps {
           order: 2;
         }
       }
-      
+
       /* QR Connection Dialog Styles */
       .qr-dialog {
         text-align: center;
         padding: 1rem;
       }
-      
+
       .qr-dialog h4 {
         color: var(--light);
         margin-bottom: 1rem;
         font-size: 1.25rem;
         font-weight: 600;
       }
-      
+
       .qr-layout {
         display: flex;
         gap: 1.5rem;
@@ -531,7 +531,7 @@
         justify-content: center;
         margin: 1rem 0;
       }
-      
+
       .qr-code-container {
         flex: 0 0 300px;
         background: #ffffff;
@@ -540,14 +540,14 @@
         border: 1px solid var(--gray-600);
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
       }
-      
+
       .qr-code-container img {
         max-width: 250px;
         width: 100%;
         height: auto;
         border-radius: 8px;
       }
-      
+
       .connection-steps {
         flex: 1;
         max-width: 400px;
@@ -557,7 +557,7 @@
         padding: 1rem;
         border: 1px solid var(--gray-600);
       }
-      
+
       .connection-steps h5 {
         color: var(--primary);
         margin-bottom: 0.75rem;
@@ -565,7 +565,7 @@
         font-weight: 600;
         text-align: center;
       }
-      
+
       .connection-steps ol {
         list-style-position: inside;
         color: var(--light);
@@ -574,18 +574,18 @@
         margin: 0;
         padding-left: 0;
       }
-      
+
       .connection-steps li {
         margin-bottom: 0.5rem;
         padding-left: 0.5rem;
       }
-      
+
       .connection-steps li:before {
         content: "→ ";
         color: var(--primary);
         font-weight: bold;
       }
-      
+
       .qr-status {
         margin-top: 1rem;
         padding: 0.75rem;
@@ -593,19 +593,19 @@
         font-size: 0.9rem;
         text-align: center;
       }
-      
+
       .qr-status.connecting {
         background: rgba(245, 158, 11, 0.1);
         border: 1px solid rgba(245, 158, 11, 0.3);
         color: var(--warning);
       }
-      
+
       @media (max-width: 768px) {
         .qr-code-container {
           padding: 0.75rem;
           flex: 1;
         }
-      
+
         .connection-steps {
           padding: 0.75rem;
           order: 2;
@@ -620,7 +620,6 @@
       </header>
 
       <div class="content">
-
         <div class="form-group">
           <label>Current User:</label>
           <div
@@ -635,7 +634,7 @@
         </div>
 
         <div id="session-status" class="session-status hidden">
-          <div class="spinner" id="status-spinner" style="display: none;"></div>
+          <div class="spinner" id="status-spinner" style="display: none"></div>
           <span id="status-text"></span>
         </div>
 
@@ -754,6 +753,16 @@
         </div>
 
         <div class="section">
+          <h2>Webhook Security</h2>
+          <div style="background: var(--dark-tertiary); border: 1px solid var(--gray-600); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+            <h3 style="color: var(--warning); margin: 0 0 0.5rem 0; font-size: 1rem;">🔐 Webhook Signature Verification</h3>
+            <p style="color: var(--light); margin: 0; font-size: 0.9rem; line-height: 1.4;">
+              Webhooks now include HMAC-SHA256 signatures for security. Go to <strong>User Management</strong> to view your webhook secrets and implement signature verification in your webhook endpoints.
+            </p>
+          </div>
+        </div>
+
+        <div class="section">
           <h2>Send Messages</h2>
           <div class="input-group">
             <label for="phone-number">Phone Number:</label>
@@ -830,7 +839,7 @@
       const checkNumBtn = document.getElementById("check-num-btn");
       const sendMsgBtn = document.getElementById("send-msg-btn");
       const fetchConversationsBtn = document.getElementById(
-        "fetch-conversations-btn"
+        "fetch-conversations-btn",
       );
       const conversationJidInput = document.getElementById("conversation-jid");
       const fetchMessagesBtn = document.getElementById("fetch-messages-btn");
@@ -874,7 +883,7 @@
       const businessLoadBtn = document.getElementById("business-load-btn");
       const businessSaveBtn = document.getElementById("business-save-btn");
       const businessRefreshBtn = document.getElementById(
-        "business-refresh-btn"
+        "business-refresh-btn",
       );
 
       const bizName = document.getElementById("biz-name");
@@ -899,36 +908,36 @@
         };
       }
 
-      function updateSessionStatus(statusClass, message = '') {
+      function updateSessionStatus(statusClass, message = "") {
         sessionStatus.className = `session-status ${statusClass}`;
-        statusText.textContent = message || statusClass.charAt(0).toUpperCase() + statusClass.slice(1);
-        if (statusClass === 'connecting') {
-          statusSpinner.style.display = 'block';
+        statusText.textContent =
+          message || statusClass.charAt(0).toUpperCase() + statusClass.slice(1);
+        if (statusClass === "connecting") {
+          statusSpinner.style.display = "block";
         } else {
-          statusSpinner.style.display = 'none';
+          statusSpinner.style.display = "none";
         }
-        sessionStatus.classList.remove('hidden');
+        sessionStatus.classList.remove("hidden");
       }
 
       function hideAllSections() {
-        const sections = document.querySelectorAll('.section');
-        sections.forEach(section => {
-          section.style.display = 'none';
+        const sections = document.querySelectorAll(".section");
+        sections.forEach((section) => {
+          section.style.display = "none";
         });
       }
 
       function showAllSections() {
-        const sections = document.querySelectorAll('.section');
-        sections.forEach(section => {
-          section.style.display = 'block';
+        const sections = document.querySelectorAll(".section");
+        sections.forEach((section) => {
+          section.style.display = "block";
         });
       }
-
 
       function showResponse(data, isError = false) {
         hideLoading();
         modalContent.innerHTML = "";
-      
+
         // Set modal title dynamically
         const modalTitle = document.getElementById("modal-title");
         if (data.qrBase64) {
@@ -936,12 +945,12 @@
         } else {
           modalTitle.textContent = "API Response";
         }
-      
+
         if (data.qrBase64 && !isError) {
           // Custom QR dialog UI
           const qrDiv = document.createElement("div");
           qrDiv.className = "qr-dialog";
-      
+
           const title = document.createElement("h4");
           title.textContent = "Scan QR Code to Connect";
           qrDiv.appendChild(title);
@@ -969,9 +978,9 @@
             "Tap the three dots menu (Android) or Settings tab (iOS).",
             "Select 'Linked Devices'.",
             "Tap 'Link a Device'.",
-            "Scan the QR code displayed on your screen."
+            "Scan the QR code displayed on your screen.",
           ];
-          steps.forEach(step => {
+          steps.forEach((step) => {
             const li = document.createElement("li");
             li.textContent = step;
             ol.appendChild(li);
@@ -983,18 +992,19 @@
 
           const statusDiv = document.createElement("div");
           statusDiv.className = "qr-status connecting";
-          statusDiv.textContent = "Waiting for scan... Please scan the QR code with WhatsApp.";
+          statusDiv.textContent =
+            "Waiting for scan... Please scan the QR code with WhatsApp.";
           qrDiv.appendChild(statusDiv);
 
           modalContent.appendChild(qrDiv);
-      
+
           // Optional: Start polling to update status when connected
           // This can be enhanced later if needed
         } else {
           // Fallback to original response display
           const responseDiv = document.createElement("div");
           responseDiv.className = `response ${isError ? "error" : "success"}`;
-      
+
           const pre = document.createElement("pre");
           let content = "";
           if (typeof data === "string") {
@@ -1044,36 +1054,39 @@
         startBtn.textContent = "Starting...";
 
         try {
-          const response = await fetch(
-            `/api/session/start`,
-            {
-              method: "POST",
-              headers: headers,
-            }
-          );
+          const response = await fetch(`/api/session/start`, {
+            method: "POST",
+            headers: headers,
+          });
 
           const data = await response.json();
           if (response.ok) {
-            if (data.status === 'connected') {
+            if (data.status === "connected") {
               // Close modal and update status for successful connection
-              modal.style.display = 'none';
-              updateSessionStatus('connected', 'Session connected');
+              modal.style.display = "none";
+              updateSessionStatus("connected", "Session connected");
               showAllSections();
               // Still show a brief success message
-              showResponse({ message: 'Successfully connected to WhatsApp!' });
-            } else if (data.status === 'waiting_qr') {
+              showResponse({ message: "Successfully connected to WhatsApp!" });
+            } else if (data.status === "waiting_qr") {
               showResponse(data);
-              updateSessionStatus('connecting', 'Please scan the QR code in the modal to connect');
+              updateSessionStatus(
+                "connecting",
+                "Please scan the QR code in the modal to connect",
+              );
             } else {
               showResponse(data);
             }
           } else {
             showResponse(data, true);
-            updateSessionStatus('error', data.message || 'Failed to start session');
+            updateSessionStatus(
+              "error",
+              data.message || "Failed to start session",
+            );
           }
         } catch (error) {
           showResponse("Network error: " + error.message, true);
-          updateSessionStatus('error', 'Network error: ' + error.message);
+          updateSessionStatus("error", "Network error: " + error.message);
         }
 
         startBtn.disabled = false;
@@ -1151,13 +1164,10 @@
         businessRefreshBtn.disabled = true;
         businessRefreshBtn.textContent = "Fetching...";
         try {
-          const response = await fetch(
-            `/api/business/refresh`,
-            {
-              method: "POST",
-              headers,
-            }
-          );
+          const response = await fetch(`/api/business/refresh`, {
+            method: "POST",
+            headers,
+          });
           const data = await response.json();
           if (!response.ok) {
             showBusinessStatus(data, true);
@@ -1171,7 +1181,7 @@
             bizShipping.value = info.shipping_details || "";
             bizMobiles.value = fromArray(info.mobile_numbers);
             showBusinessStatus(
-              "Fetched and updated from WhatsApp (where available)."
+              "Fetched and updated from WhatsApp (where available).",
             );
           }
         } catch (e) {
@@ -1190,12 +1200,9 @@
         statusBtn.textContent = "Checking...";
 
         try {
-          const response = await fetch(
-            `/api/session/status`,
-            {
-              headers: headers,
-            }
-          );
+          const response = await fetch(`/api/session/status`, {
+            headers: headers,
+          });
 
           const data = await response.json();
           if (response.ok) {
@@ -1220,13 +1227,10 @@
         logoutBtn.textContent = "Logging out...";
 
         try {
-          const response = await fetch(
-            `/api/session/logout`,
-            {
-              method: "POST",
-              headers: headers,
-            }
-          );
+          const response = await fetch(`/api/session/logout`, {
+            method: "POST",
+            headers: headers,
+          });
 
           const data = await response.json();
           if (response.ok) {
@@ -1264,14 +1268,11 @@
         checkNumBtn.textContent = "Checking...";
 
         try {
-          const response = await fetch(
-            `/api/message/check-number`,
-            {
-              method: "POST",
-              headers: headers,
-              body: JSON.stringify({ to: phoneNumber }),
-            }
-          );
+          const response = await fetch(`/api/message/check-number`, {
+            method: "POST",
+            headers: headers,
+            body: JSON.stringify({ to: phoneNumber }),
+          });
 
           const data = await response.json();
           if (response.ok) {
@@ -1319,7 +1320,7 @@
               method: "POST",
               headers: headers,
               body: JSON.stringify({ to: phoneNumber, message: message }),
-            }
+            },
           );
 
           const data = await response.json();
@@ -1344,12 +1345,9 @@
         fetchConversationsBtn.textContent = "Fetching...";
 
         try {
-          const response = await fetch(
-            `/api/message/conversations`,
-            {
-              headers: headers,
-            }
-          );
+          const response = await fetch(`/api/message/conversations`, {
+            headers: headers,
+          });
 
           const data = await response.json();
           if (response.ok) {
@@ -1380,12 +1378,10 @@
 
         try {
           const response = await fetch(
-            `/api/message/messages?jid=${encodeURIComponent(
-              jid
-            )}`,
+            `/api/message/messages?jid=${encodeURIComponent(jid)}`,
             {
               headers: headers,
-            }
+            },
           );
 
           const data = await response.json();
@@ -1425,21 +1421,31 @@
         hideAllSections();
 
         // Check session status on load (manual start required if not connected)
-        updateSessionStatus('connecting', 'Checking session status...');
+        updateSessionStatus("connecting", "Checking session status...");
         const headers = getAuthHeaders();
         if (!headers) return;
 
         try {
-          const sessionResponse = await fetch(`/api/session/status`, { headers });
+          const sessionResponse = await fetch(`/api/session/status`, {
+            headers,
+          });
           const sessionData = await sessionResponse.json();
           if (sessionResponse.ok && sessionData.isConnected) {
-            updateSessionStatus('connected', 'Session active');
+            updateSessionStatus("connected", "Session active");
             showAllSections();
           } else {
-            updateSessionStatus('error', 'Session not active. Please click "Start Session" to connect manually.');
+            updateSessionStatus(
+              "error",
+              'Session not active. Please click "Start Session" to connect manually.',
+            );
           }
         } catch (error) {
-          updateSessionStatus('error', 'Network error checking session: ' + error.message + '. Please try starting session manually.');
+          updateSessionStatus(
+            "error",
+            "Network error checking session: " +
+              error.message +
+              ". Please try starting session manually.",
+          );
         }
 
         // Automatically load business details on page load

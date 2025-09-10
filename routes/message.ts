@@ -33,21 +33,14 @@ router.post(
   validator(sendText),
   async (req: Request, res: Response): Promise<void> => {
     try {
-      // Require tenant id from query instead of decoding from auth token
-      const username = (req.query.username ||
-        req.query.tenantId ||
-        req.query.tenant_id ||
-        req.query.tid) as string | undefined;
-      if (!username || typeof username !== "string" || !username.trim()) {
-        (res as any).sendError(
-          400,
-          "username is required as a query parameter",
-        );
+      const username = req.user?.userId;
+      if (!username) {
+        (res as any).sendError(401, "Unauthorized: user not found in token");
         return;
       }
 
       const { to, message } = req.body;
-      const result = await WAManager.sendMessage(username!.trim(), to, message);
+      const result = await WAManager.sendMessage(username, to, message);
       (res as any).sendResponse(200, result);
     } catch (error) {
       (res as any).sendError(500, error);

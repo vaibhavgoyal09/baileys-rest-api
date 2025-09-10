@@ -65,14 +65,17 @@ class PrismaStore {
   async upsertChats(chats: Chat[] = []): Promise<void> {
     try {
       const operations = chats
-        .map(chat => {
+        .map((chat) => {
           const jid = chat.id || chat.jid;
           if (!jid) return null;
 
           const updateData: any = {};
-          if (chat.name || chat.subject) updateData.name = chat.name || chat.subject;
-          updateData.isGroup = chat.id?.endsWith("@g.us") || chat.jid?.endsWith("@g.us") || false;
-          if (typeof chat.unreadCount === "number") updateData.unreadCount = chat.unreadCount;
+          if (chat.name || chat.subject)
+            updateData.name = chat.name || chat.subject;
+          updateData.isGroup =
+            chat.id?.endsWith("@g.us") || chat.jid?.endsWith("@g.us") || false;
+          if (typeof chat.unreadCount === "number")
+            updateData.unreadCount = chat.unreadCount;
 
           return prisma.chat.upsert({
             where: { jid },
@@ -80,8 +83,12 @@ class PrismaStore {
             create: {
               jid,
               name: chat.name || chat.subject || null,
-              isGroup: chat.id?.endsWith("@g.us") || chat.jid?.endsWith("@g.us") || false,
-              unreadCount: typeof chat.unreadCount === "number" ? chat.unreadCount : 0,
+              isGroup:
+                chat.id?.endsWith("@g.us") ||
+                chat.jid?.endsWith("@g.us") ||
+                false,
+              unreadCount:
+                typeof chat.unreadCount === "number" ? chat.unreadCount : 0,
             },
           });
         })
@@ -99,16 +106,24 @@ class PrismaStore {
   }
 
   // Upsert or update a single chat's partial fields
-  async upsertChatPartial(jid: string, fields: Partial<Chat> = {}): Promise<void> {
+  async upsertChatPartial(
+    jid: string,
+    fields: Partial<Chat> = {},
+  ): Promise<void> {
     if (!jid) return;
     try {
       const updateData: any = {};
-      if (fields.name || fields.subject) updateData.name = fields.name || fields.subject;
-      if (typeof fields.isGroup === "boolean") updateData.isGroup = fields.isGroup;
+      if (fields.name || fields.subject)
+        updateData.name = fields.name || fields.subject;
+      if (typeof fields.isGroup === "boolean")
+        updateData.isGroup = fields.isGroup;
       else if (jid.endsWith("@g.us")) updateData.isGroup = true;
-      if (typeof fields.unreadCount === "number") updateData.unreadCount = fields.unreadCount;
-      if (fields.lastMessageTimestamp) updateData.lastMessageTimestamp = new Date(fields.lastMessageTimestamp);
-      if (fields.lastMessageText) updateData.lastMessageText = fields.lastMessageText;
+      if (typeof fields.unreadCount === "number")
+        updateData.unreadCount = fields.unreadCount;
+      if (fields.lastMessageTimestamp)
+        updateData.lastMessageTimestamp = new Date(fields.lastMessageTimestamp);
+      if (fields.lastMessageText)
+        updateData.lastMessageText = fields.lastMessageText;
 
       await prisma.chat.upsert({
         where: { jid },
@@ -116,9 +131,15 @@ class PrismaStore {
         create: {
           jid,
           name: fields.name || fields.subject || null,
-          isGroup: typeof fields.isGroup === "boolean" ? fields.isGroup : jid.endsWith("@g.us"),
-          unreadCount: typeof fields.unreadCount === "number" ? fields.unreadCount : 0,
-          lastMessageTimestamp: fields.lastMessageTimestamp ? new Date(fields.lastMessageTimestamp) : null,
+          isGroup:
+            typeof fields.isGroup === "boolean"
+              ? fields.isGroup
+              : jid.endsWith("@g.us"),
+          unreadCount:
+            typeof fields.unreadCount === "number" ? fields.unreadCount : 0,
+          lastMessageTimestamp: fields.lastMessageTimestamp
+            ? new Date(fields.lastMessageTimestamp)
+            : null,
           lastMessageText: fields.lastMessageText || null,
         },
       });
@@ -135,7 +156,9 @@ class PrismaStore {
   async saveMessage(messageInfo: MessageInfo): Promise<void> {
     try {
       const lastText = this.stringifyContent(messageInfo.content);
-      const timestamp = messageInfo.timestamp ? new Date(messageInfo.timestamp) : new Date();
+      const timestamp = messageInfo.timestamp
+        ? new Date(messageInfo.timestamp)
+        : new Date();
 
       // Ensure chat exists first and update last message info
       const chatUpdate: Partial<Chat> = {
@@ -182,10 +205,7 @@ class PrismaStore {
 
       const chats = await prisma.chat.findMany({
         where,
-        orderBy: [
-          { lastMessageTimestamp: 'desc' },
-          { jid: 'asc' },
-        ],
+        orderBy: [{ lastMessageTimestamp: "desc" }, { jid: "asc" }],
         take: limit,
       });
 
@@ -194,7 +214,9 @@ class PrismaStore {
         name: chat.name,
         isGroup: chat.isGroup,
         unreadCount: chat.unreadCount || 0,
-        lastMessageTimestamp: chat.lastMessageTimestamp ? chat.lastMessageTimestamp.getTime() : null,
+        lastMessageTimestamp: chat.lastMessageTimestamp
+          ? chat.lastMessageTimestamp.getTime()
+          : null,
         lastMessageText: chat.lastMessageText || null,
       }));
     } catch (e) {
@@ -224,7 +246,7 @@ class PrismaStore {
 
       const messages = await prisma.message.findMany({
         where,
-        orderBy: { timestamp: 'desc' },
+        orderBy: { timestamp: "desc" },
         take: limit,
       });
 
@@ -248,16 +270,14 @@ class PrismaStore {
   }
 
   // Return the oldest message anchor for a chat
-  async getOldestMessageAnchor(
-    jid: string,
-  ): Promise<{
+  async getOldestMessageAnchor(jid: string): Promise<{
     key: { id: string; remoteJid: string; fromMe: boolean };
     messageTimestamp: number;
   } | null> {
     try {
       const message = await prisma.message.findFirst({
         where: { jid },
-        orderBy: { timestamp: 'asc' },
+        orderBy: { timestamp: "asc" },
       });
 
       if (!message) {
@@ -269,7 +289,9 @@ class PrismaStore {
         remoteJid: String(message.jid),
         fromMe: !!message.fromMe,
       };
-      const messageTimestamp = message.timestamp ? message.timestamp.getTime() : Date.now();
+      const messageTimestamp = message.timestamp
+        ? message.timestamp.getTime()
+        : Date.now();
 
       return { key, messageTimestamp };
     } catch (e) {
@@ -290,7 +312,9 @@ class PrismaStore {
       const operations = messages.map(async (message) => {
         const { idempotencyKey, ...messageInfo } = message;
         const lastText = this.stringifyContent(messageInfo.content);
-        const timestamp = messageInfo.timestamp ? new Date(messageInfo.timestamp) : new Date();
+        const timestamp = messageInfo.timestamp
+          ? new Date(messageInfo.timestamp)
+          : new Date();
 
         // Ensure chat exists
         const chatUpdate: Partial<Chat> = {
@@ -380,7 +404,9 @@ class PrismaStore {
         mobile_numbers: businessInfo.mobileNumbers
           ? JSON.parse(businessInfo.mobileNumbers)
           : null,
-        last_updated: businessInfo.lastUpdated ? businessInfo.lastUpdated.getTime() : null,
+        last_updated: businessInfo.lastUpdated
+          ? businessInfo.lastUpdated.getTime()
+          : null,
       };
     } catch (e) {
       errorLogger.error({
@@ -414,14 +440,34 @@ class PrismaStore {
 
       const merged = {
         name: info.name !== undefined ? info.name : current.name,
-        workingHours: info.working_hours !== undefined ? info.working_hours : current.working_hours,
-        locationUrl: info.location_url !== undefined ? info.location_url : current.location_url,
-        shippingDetails: info.shipping_details !== undefined ? info.shipping_details : current.shipping_details,
-        instagramUrl: info.instagram_url !== undefined ? info.instagram_url : current.instagram_url,
-        websiteUrl: info.website_url !== undefined ? info.website_url : current.website_url,
-        mobileNumbers: info.mobile_numbers !== undefined
-          ? (info.mobile_numbers ? JSON.stringify(info.mobile_numbers) : null)
-          : (current.mobile_numbers ? JSON.stringify(current.mobile_numbers) : null),
+        workingHours:
+          info.working_hours !== undefined
+            ? info.working_hours
+            : current.working_hours,
+        locationUrl:
+          info.location_url !== undefined
+            ? info.location_url
+            : current.location_url,
+        shippingDetails:
+          info.shipping_details !== undefined
+            ? info.shipping_details
+            : current.shipping_details,
+        instagramUrl:
+          info.instagram_url !== undefined
+            ? info.instagram_url
+            : current.instagram_url,
+        websiteUrl:
+          info.website_url !== undefined
+            ? info.website_url
+            : current.website_url,
+        mobileNumbers:
+          info.mobile_numbers !== undefined
+            ? info.mobile_numbers
+              ? JSON.stringify(info.mobile_numbers)
+              : null
+            : current.mobile_numbers
+              ? JSON.stringify(current.mobile_numbers)
+              : null,
       };
 
       await prisma.businessInfo.upsert({
