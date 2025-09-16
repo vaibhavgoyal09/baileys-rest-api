@@ -809,6 +809,128 @@ class TenantSession {
       throw error;
     }
   }
+
+  async sendMessageV2(to: string, type: string, content: any): Promise<any> {
+    if (!this.isConnected) {
+      throw new Error("WhatsApp connection is not active");
+    }
+
+    let jid = String(to || "");
+    if (!jid.includes("@")) {
+      const digits = jid.replace(/[^\d]/g, "");
+      if (digits) {
+        jid = `${digits}@s.whatsapp.net`;
+      }
+    }
+
+    try {
+      let messagePayload: any;
+      let messageType = type;
+
+      switch (type) {
+        case "text":
+          messagePayload = { text: content };
+          messageType = "conversation";
+          break;
+        case "image":
+          messagePayload = {
+            image: { url: content.url },
+            caption: content.caption,
+            mimetype: content.mimetype
+          };
+          break;
+        case "video":
+          messagePayload = {
+            video: { url: content.url },
+            caption: content.caption,
+            mimetype: content.mimetype
+          };
+          break;
+        case "audio":
+          messagePayload = {
+            audio: { url: content.url },
+            mimetype: content.mimetype
+          };
+          break;
+        case "document":
+          messagePayload = {
+            document: { url: content.url },
+            fileName: content.filename,
+            mimetype: content.mimetype
+          };
+          break;
+        case "sticker":
+          messagePayload = {
+            sticker: { url: content.url },
+            mimetype: content.mimetype
+          };
+          break;
+        case "location":
+          messagePayload = {
+            location: {
+              degreesLatitude: content.latitude,
+              degreesLongitude: content.longitude,
+              name: content.name,
+              address: content.address
+            }
+          };
+          break;
+        case "contact":
+          messagePayload = {
+            contacts: {
+              displayName: content.name,
+              contacts: [{
+                vcard: content.vcard || `BEGIN:VCARD\nVERSION:3.0\nFN:${content.name}\nTEL:${content.phone}\nEND:VCARD`
+              }]
+            }
+          };
+          break;
+        default:
+          throw new Error(`Unsupported message type: ${type}`);
+      }
+
+      const result = await this.sock.sendMessage(jid, messagePayload);
+
+      try {
+        const timestamp = result.messageTimestamp || Math.floor(Date.now() / 1000);
+        const messageInfo: MessageInfo = {
+          id: result.key.id,
+          from: result.key.remoteJid || jid,
+          fromMe: true,
+          timestamp,
+          type: messageType,
+          pushName: null,
+          content: { type, ...content },
+          isGroup: (jid || "").endsWith("@g.us"),
+        };
+        const res = await ingestion.enqueueMessage(messageInfo);
+        if (!res.accepted) {
+          errorLogger.error({
+            msg: "Failed to enqueue outgoing message",
+            error: res.reason,
+            idempotencyKey: res.idempotencyKey,
+            correlationId: res.correlationId,
+            username: this.username,
+          });
+        }
+      } catch (e) {
+        errorLogger.error({
+          msg: "Failed to persist outgoing message",
+          error: (e as Error)?.message || e,
+          username: this.username,
+        });
+      }
+
+      return result;
+    } catch (error: any) {
+      errorLogger.error({
+        msg: "Failed to send message",
+        error: error.message,
+        username: this.username,
+      });
+      throw error;
+    }
+  }
 }
 
 class TenantManager {
@@ -851,6 +973,15 @@ class TenantManager {
 
   async checkNumber(username: Username, phoneNumber: string): Promise<any> {
     return this.getOrCreate(username).checkNumber(phoneNumber);
+  }
+
+  async sendMessageV2(
+    username: Username,
+    to: string,
+    type: string,
+    content: any
+  ): Promise<any> {
+    return this.getOrCreate(username).sendMessageV2(to, type, content);
   }
 
   async refreshBusinessInfo(username: Username) {

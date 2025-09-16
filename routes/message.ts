@@ -9,6 +9,7 @@ import {
   sendText,
   checkNumber,
   listConversations,
+  sendMessage,
 } from "../validators/message.js";
 
 router.post(
@@ -86,5 +87,26 @@ router.get("/messages", async (req: Request, res: Response): Promise<void> => {
     (res as any).sendError(500, error);
   }
 });
+
+router.post(
+  "/send",
+  verifyToken,
+  validator(sendMessage),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const username = req.user?.userId;
+      if (!username) {
+        (res as any).sendError(401, "Unauthorized: user not found in token");
+        return;
+      }
+
+      const { to, type, content } = req.body;
+      const result = await WAManager.sendMessageV2(username, to, type, content);
+      (res as any).sendResponse(200, result);
+    } catch (error) {
+      (res as any).sendError(500, error);
+    }
+  },
+);
 
 export default router;

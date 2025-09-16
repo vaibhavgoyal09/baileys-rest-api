@@ -317,6 +317,93 @@ class PrismaConfigStore {
       });
     }
   }
+
+  // Excluded numbers management
+  async getExcludedNumbers(username: Username): Promise<string[]> {
+    try {
+      await this.ensureTenant(username);
+      const excludedNumbers = await prisma.excludedNumber.findMany({
+        where: { username },
+        select: { phoneNumber: true },
+        orderBy: { createdAt: 'asc' },
+      });
+      return excludedNumbers.map(n => n.phoneNumber);
+    } catch (e) {
+      errorLogger.error({
+        msg: "getExcludedNumbers failed",
+        username,
+        error: (e as Error)?.message || e,
+      });
+      return [];
+    }
+  }
+
+  async addExcludedNumber(username: Username, phoneNumber: string): Promise<boolean> {
+    try {
+      await this.ensureTenant(username);
+      await prisma.excludedNumber.create({
+        data: {
+          username,
+          phoneNumber,
+        },
+      });
+      return true;
+    } catch (e: any) {
+      // Handle unique constraint violation gracefully
+      if (e.code === 'P2002') {
+        return true; // Already exists, consider it successful
+      }
+      errorLogger.error({
+        msg: "addExcludedNumber failed",
+        username,
+        phoneNumber,
+        error: (e as Error)?.message || e,
+      });
+      return false;
+    }
+  }
+
+  async removeExcludedNumber(username: Username, phoneNumber: string): Promise<boolean> {
+    try {
+      await this.ensureTenant(username);
+      await prisma.excludedNumber.deleteMany({
+        where: {
+          username,
+          phoneNumber,
+        },
+      });
+      return true;
+    } catch (e) {
+      errorLogger.error({
+        msg: "removeExcludedNumber failed",
+        username,
+        phoneNumber,
+        error: (e as Error)?.message || e,
+      });
+      return false;
+    }
+  }
+
+  async isNumberExcluded(username: Username, phoneNumber: string): Promise<boolean> {
+    try {
+      await this.ensureTenant(username);
+      const excluded = await prisma.excludedNumber.findFirst({
+        where: {
+          username,
+          phoneNumber,
+        },
+      });
+      return !!excluded;
+    } catch (e) {
+      errorLogger.error({
+        msg: "isNumberExcluded failed",
+        username,
+        phoneNumber,
+        error: (e as Error)?.message || e,
+      });
+      return false;
+    }
+  }
 }
 
 const configStore = new PrismaConfigStore();

@@ -490,7 +490,7 @@ class WhatsAppService {
                 await WhatsAppService.notifyWebhook("message.received", {
                   message: messageInfo,
                   business: businessInfo,
-                });
+                }, "default"); // Use "default" username for now
                 logger.info({
                   msg: "New message processed",
                   messageId: messageInfo.id,
@@ -628,13 +628,30 @@ class WhatsAppService {
     }
   }
 
-  static async notifyWebhook(event: string, data: any): Promise<void> {
+  static async notifyWebhook(event: string, data: any, username?: string): Promise<void> {
     const webhookUrl = await ConfigStore.getWebhookUrl("default");
     if (!webhookUrl) {
       logger.warn({
         msg: "Webhook URL not configured, skipping notification",
       });
       return;
+    }
+
+    // Check if this is a message event and if the sender is excluded
+    if (event === "message.received" && data?.message?.from && username) {
+      const senderNumber = WhatsAppService.extractPhoneNumber(data.message.from);
+      if (senderNumber) {
+        const isExcluded = await ConfigStore.isNumberExcluded(username, senderNumber);
+        if (isExcluded) {
+          logger.debug({
+            msg: "Skipping webhook for excluded number",
+            phoneNumber: senderNumber,
+            username,
+            messageId: data.message.id,
+          });
+          return;
+        }
+      }
     }
 
     try {
@@ -671,6 +688,23 @@ class WhatsAppService {
         data: JSON.stringify(data),
       });
     }
+  }
+
+  // Helper method to extract phone number from JID
+  private static extractPhoneNumber(jid: string): string | null {
+    if (!jid) return null;
+    
+    // Remove @s.whatsapp.net or @g.us suffix
+    const parts = jid.split('@');
+    const cleanJid = parts[0];
+    if (!cleanJid) return null;
+    
+    // Remove any non-digit characters and ensure it starts with +
+    const digits = cleanJid.replace(/[^\d]/g, '');
+    if (!digits) return null;
+    
+    // Return in international format (assuming numbers are stored with country code)
+    return `+${digits}`;
   }
 
   getConnectionStatus(): ConnectionStatus {

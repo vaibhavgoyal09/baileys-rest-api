@@ -12,72 +12,73 @@ datasource db {
 
 // WhatsApp Chat model
 model Chat {
-  jid                    String    @id
-  name                   String?
-  isGroup                Boolean   @default(false)
-  unreadCount            Int       @default(0)
-  lastMessageTimestamp   DateTime? @db.Timestamp(6)
-  lastMessageText        String?
-  messages               Message[]
+  jid                  String    @id
+  name                 String?
+  isGroup              Boolean   @default(false)
+  unreadCount          Int       @default(0)
+  lastMessageTimestamp DateTime? @db.Timestamp(6)
+  lastMessageText      String?
+  messages             Message[]
 
   @@map("chats")
 }
 
 // WhatsApp Message model
 model Message {
-  id          String    @id
-  jid         String
-  fromMe      Boolean   @default(false)
-  timestamp   DateTime? @db.Timestamp(6)
-  type        String?
-  pushName    String?
-  content     String?
-  chat        Chat      @relation(fields: [jid], references: [jid], onDelete: Cascade)
+  id        String    @id
+  jid       String
+  fromMe    Boolean   @default(false)
+  timestamp DateTime? @db.Timestamp(6)
+  type      String?
+  pushName  String?
+  content   String?
+  chat      Chat      @relation(fields: [jid], references: [jid], onDelete: Cascade)
 
   @@map("messages")
 }
 
 // Global Business Info (single row)
 model BusinessInfo {
-  id               Int       @id @default(1)
-  name             String?
-  workingHours     String?
-  locationUrl      String?
-  shippingDetails  String?
-  instagramUrl     String?
-  websiteUrl       String?
-  mobileNumbers    String?   // JSON string
-  lastUpdated      DateTime? @db.Timestamp(6)
+  id              Int       @id @default(1)
+  name            String?
+  workingHours    String?
+  locationUrl     String?
+  shippingDetails String?
+  instagramUrl    String?
+  websiteUrl      String?
+  mobileNumbers   String? // JSON string
+  lastUpdated     DateTime? @db.Timestamp(6)
 
   @@map("business_info")
 }
 
 // Webhook configuration
 model Webhook {
-  id          String   @id @default(cuid())
-  url         String
-  username    String
-  name        String?  // Optional name for the webhook
-  secret      String   // Secret key for webhook signature verification
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now()) @db.Timestamp(6)
-  updatedAt   DateTime @default(now()) @updatedAt @db.Timestamp(6)
-  user        User     @relation(fields: [username], references: [username], onDelete: Cascade)
+  id        String   @id @default(cuid())
+  url       String
+  username  String
+  name      String? // Optional name for the webhook
+  secret    String // Secret key for webhook signature verification
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now()) @db.Timestamp(6)
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamp(6)
+  user      User     @relation(fields: [username], references: [username], onDelete: Cascade)
 
   @@map("webhooks")
 }
 
 // Tenant/User configuration
 model User {
-  username      String             @id
-  name          String
-  email         String             @unique
-  hashedPassword String
-  webhookUrl    String?            // Keep for backward compatibility, but will be deprecated
-  createdAt     DateTime           @default(now()) @db.Timestamp(6)
-  updatedAt     DateTime           @default(now()) @updatedAt @db.Timestamp(6)
-  businessInfo  BusinessInfoTenant?
-  webhooks      Webhook[]
+  username        String              @id
+  name            String
+  email           String              @unique
+  hashedPassword  String
+  webhookUrl      String? // Keep for backward compatibility, but will be deprecated
+  createdAt       DateTime            @default(now()) @db.Timestamp(6)
+  updatedAt       DateTime            @default(now()) @updatedAt @db.Timestamp(6)
+  businessInfo    BusinessInfoTenant?
+  webhooks        Webhook[]
+  excludedNumbers ExcludedNumber[]
 
   @@map("users")
 }
@@ -91,9 +92,22 @@ model BusinessInfoTenant {
   shippingDetails String?
   instagramUrl    String?
   websiteUrl      String?
-  mobileNumbers   String?  // JSON string
+  mobileNumbers   String? // JSON string
   lastUpdated     DateTime @default(now()) @updatedAt @db.Timestamp(6)
   user            User     @relation(fields: [username], references: [username], onDelete: Cascade)
 
   @@map("business_info_tenant")
+}
+
+// Excluded numbers for webhook filtering
+model ExcludedNumber {
+  id          String   @id @default(cuid())
+  username    String
+  phoneNumber String // Phone number in international format (e.g., +1234567890)
+  createdAt   DateTime @default(now()) @db.Timestamp(6)
+  updatedAt   DateTime @default(now()) @updatedAt @db.Timestamp(6)
+  user        User     @relation(fields: [username], references: [username], onDelete: Cascade)
+
+  @@unique([username, phoneNumber])
+  @@map("excluded_numbers")
 }

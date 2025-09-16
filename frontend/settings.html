@@ -394,6 +394,61 @@
           </div>
         </div>
       </div>
+
+      <div class="section">
+        <h2>Excluded Numbers Management</h2>
+        <div class="guidance-text">
+          <p>
+            <strong>Webhook Filtering:</strong> Add phone numbers to exclude from webhook notifications.
+            Messages from these numbers will still be stored in the database but won't trigger webhook calls.
+            Use international format (e.g., +1234567890).
+          </p>
+        </div>
+
+        <!-- Add Excluded Number Form -->
+        <div class="form-group">
+          <h3 style="color: var(--light); margin-bottom: 1rem">
+            Add Excluded Number
+          </h3>
+          <div
+            style="
+              display: grid;
+              grid-template-columns: 1fr auto;
+              gap: 1rem;
+              align-items: end;
+            "
+          >
+            <div>
+              <label
+                for="excluded-number-input"
+                style="display: block; margin-bottom: 0.5rem"
+                >Phone Number:</label
+              >
+              <input
+                type="text"
+                id="excluded-number-input"
+                placeholder="+1234567890"
+                style="width: 100%"
+              />
+            </div>
+            <button id="add-excluded-number-btn" style="padding: 0.75rem 1.25rem">
+              Add Number
+            </button>
+          </div>
+          <div class="error" id="add-excluded-number-error"></div>
+          <div class="success" id="add-excluded-number-success"></div>
+        </div>
+
+        <!-- Excluded Numbers List -->
+        <div class="form-group">
+          <h3 style="color: var(--light); margin-bottom: 1rem">
+            Excluded Numbers
+          </h3>
+          <div id="excluded-numbers-list">
+            <p style="color: var(--gray-400)">Loading excluded numbers...</p>
+          </div>
+        </div>
+      </div>
     </div>
 
     <script>
@@ -413,6 +468,11 @@
       const webhooksList = document.getElementById("webhooks-list");
       const addWebhookError = document.getElementById("add-webhook-error");
       const addWebhookSuccess = document.getElementById("add-webhook-success");
+      const excludedNumberInput = document.getElementById("excluded-number-input");
+      const addExcludedNumberBtn = document.getElementById("add-excluded-number-btn");
+      const excludedNumbersList = document.getElementById("excluded-numbers-list");
+      const addExcludedNumberError = document.getElementById("add-excluded-number-error");
+      const addExcludedNumberSuccess = document.getElementById("add-excluded-number-success");
 
       function getAuthHeaders() {
         const token = localStorage.getItem("jwtToken");
@@ -810,6 +870,124 @@
       window.showApiKey = showApiKey;
       window.copyApiKey = copyApiKey;
 
+      // Load excluded numbers
+      async function loadExcludedNumbers() {
+        const headers = getAuthHeaders();
+        if (!headers) return;
+
+        try {
+          const response = await fetch("/api/excluded-numbers", { headers });
+          const data = await response.json();
+
+          if (response.ok) {
+            renderExcludedNumbersList(data.data || []);
+          } else {
+            excludedNumbersList.innerHTML =
+              '<p style="color: var(--error);">Failed to load excluded numbers</p>';
+          }
+        } catch (error) {
+          excludedNumbersList.innerHTML =
+            '<p style="color: var(--error);">Error loading excluded numbers</p>';
+        }
+      }
+
+      // Render excluded numbers list
+      function renderExcludedNumbersList(numbers) {
+        if (numbers.length === 0) {
+          excludedNumbersList.innerHTML =
+            '<p style="color: var(--gray-400);">No numbers excluded yet</p>';
+          return;
+        }
+
+        excludedNumbersList.innerHTML = numbers
+          .map(
+            (number) => `
+          <div style="background: var(--dark-tertiary); border: 1px solid var(--gray-600); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div style="font-family: monospace; font-size: 1rem; color: var(--light);">
+                ${number}
+              </div>
+              <button class="btn-danger" onclick="removeExcludedNumber('${number}')" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;">
+                Remove
+              </button>
+            </div>
+          </div>
+        `,
+          )
+          .join("");
+      }
+
+      // Add excluded number
+      addExcludedNumberBtn.addEventListener("click", async () => {
+        const headers = getAuthHeaders();
+        if (!headers) return;
+
+        const phoneNumber = excludedNumberInput.value.trim();
+
+        if (!phoneNumber) {
+          showError(addExcludedNumberError, "Phone number is required");
+          return;
+        }
+
+        // Validate phone number format
+        const phoneRegex = /^\+[1-9]\d{1,14}$/;
+        if (!phoneRegex.test(phoneNumber)) {
+          showError(addExcludedNumberError, "Phone number must be in international format (e.g., +1234567890)");
+          return;
+        }
+
+        addExcludedNumberBtn.disabled = true;
+        addExcludedNumberBtn.textContent = "Adding...";
+
+        try {
+          const response = await fetch("/api/excluded-numbers", {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ phone_number: phoneNumber }),
+          });
+
+          const data = await response.json();
+          if (response.ok) {
+            showSuccess(addExcludedNumberSuccess, "Number added to exclusion list");
+            excludedNumberInput.value = "";
+            loadExcludedNumbers();
+          } else {
+            showError(addExcludedNumberError, data.message || "Failed to add number to exclusion list");
+          }
+        } catch (error) {
+          showError(addExcludedNumberError, "Network error: " + error.message);
+        }
+
+        addExcludedNumberBtn.disabled = false;
+        addExcludedNumberBtn.textContent = "Add Number";
+      });
+
+      // Remove excluded number
+      async function removeExcludedNumber(phoneNumber) {
+        if (!confirm(`Are you sure you want to remove ${phoneNumber} from the exclusion list?`)) return;
+
+        const headers = getAuthHeaders();
+        if (!headers) return;
+
+        try {
+          const response = await fetch(`/api/excluded-numbers/${encodeURIComponent(phoneNumber)}`, {
+            method: "DELETE",
+            headers,
+          });
+
+          if (response.ok) {
+            loadExcludedNumbers();
+          } else {
+            alert("Failed to remove number from exclusion list");
+          }
+        } catch (error) {
+          alert("Network error: " + error.message);
+        }
+      }
+
+      // Make functions global for onclick handlers
+      window.removeExcludedNumber = removeExcludedNumber;
+
       // Initialize page
       document.addEventListener("DOMContentLoaded", () => {
         const token = localStorage.getItem("jwtToken");
@@ -826,6 +1004,7 @@
 
         loadCurrentUserInfo();
         loadWebhooks();
+        loadExcludedNumbers();
       });
     </script>
   </body>

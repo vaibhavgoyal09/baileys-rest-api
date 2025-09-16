@@ -14,6 +14,7 @@ import sessionRoutes from "./routes/session.js";
 import messageRoutes from "./routes/message.js";
 import businessRoutes from "./routes/business.js";
 import authRoutes from "./routes/auth.js";
+import excludedNumbersRoutes from "./routes/excluded-numbers.js";
 
 // Services
 import ingestion from "./services/ingestion.js";
@@ -58,6 +59,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/session", sessionRoutes);
 app.use("/api/message", messageRoutes);
 app.use("/api/business", businessRoutes);
+app.use("/api/excluded-numbers", excludedNumbersRoutes);
 
 // Health/Readiness and Metrics
 app.get("/health", async (req: Request, res: Response): Promise<void> => {
